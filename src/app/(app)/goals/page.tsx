@@ -1,9 +1,7 @@
 import dynamic from "next/dynamic";
 import { Suspense } from "react";
 
-const GoalsContent = dynamic(() => import("./goals-content"), {
-  ssr: false,
-});
+const GoalsContent = dynamic(() => import("./goals-content"));
 
 export default function GoalsPage() {
   return (

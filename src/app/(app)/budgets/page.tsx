@@ -1,9 +1,7 @@
 import dynamic from "next/dynamic";
 import { Suspense } from "react";
 
-const BudgetsContent = dynamic(() => import("./budgets-content"), {
-  ssr: false,
-});
+const BudgetsContent = dynamic(() => import("./budgets-content"));
 
 export default function BudgetsPage() {
   return (
