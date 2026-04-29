@@ -1,9 +1,7 @@
 import dynamic from "next/dynamic";
 import { Suspense } from "react";
 
-const SettingsContent = dynamic(() => import("./settings-content"), {
-  ssr: false,
-});
+const SettingsContent = dynamic(() => import("./settings-content"));
 
 export default function SettingsPage() {
   return (

@@ -1,9 +1,7 @@
 import dynamic from "next/dynamic";
 import { Suspense } from "react";
 
-const TransactionsContent = dynamic(() => import("./transactions-content"), {
-  ssr: false,
-});
+const TransactionsContent = dynamic(() => import("./transactions-content"));
 
 export default function TransactionsPage() {
   return (
