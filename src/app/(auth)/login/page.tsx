@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { signIn } from "@/lib/nhost";
+import { signIn, resendVerificationEmail } from "@/lib/nhost";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,8 @@ export default function LoginPage() {
   const [password, setPassword] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [showPassword, setShowPassword] = React.useState(false);
+  const [needsVerification, setNeedsVerification] = React.useState(false);
+  const [resending, setResending] = React.useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -30,11 +32,23 @@ export default function LoginPage() {
       
       if (result.error) {
         console.error("Login error:", result.error);
-        toast({
-          title: "Error",
-          description: result.error.message,
-          variant: "destructive",
-        });
+        const errorMsg = result.error.message || "";
+        
+        // Check if user needs verification
+        if (errorMsg.toLowerCase().includes("not verified") || errorMsg.toLowerCase().includes("unverified")) {
+          setNeedsVerification(true);
+          toast({
+            title: "Email Not Verified",
+            description: "Please check your email for a verification link, or click below to resend it.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: errorMsg,
+            variant: "destructive",
+          });
+        }
       } else {
         console.log("Login successful");
         toast({
@@ -56,6 +70,34 @@ export default function LoginPage() {
     }
 
     setLoading(false);
+  }
+
+  async function handleResendVerification() {
+    if (!email) {
+      toast({
+        title: "Error",
+        description: "Please enter your email address",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setResending(true);
+    const result = await resendVerificationEmail(email);
+    
+    if (result.error) {
+      toast({
+        title: "Error",
+        description: result.error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Verification Email Sent",
+        description: "Please check your email and click the verification link.",
+      });
+    }
+    setResending(false);
   }
 
   return (
@@ -114,6 +156,24 @@ export default function LoginPage() {
             >
               {loading ? "Signing in..." : "Sign In"}
             </Button>
+            
+            {needsVerification && (
+              <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                <p className="text-sm text-amber-400 mb-2">
+                  Your email is not verified. Check your inbox or resend the verification email.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={resending}
+                  onClick={handleResendVerification}
+                  className="w-full border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                >
+                  {resending ? "Sending..." : "Resend Verification Email"}
+                </Button>
+              </div>
+            )}
           </form>
           <div className="mt-6 text-center text-sm text-gray-400">
             Don&apos;t have an account?{" "}

@@ -102,6 +102,36 @@ export async function signOut() {
   return { error: null }
 }
 
+export async function resendVerificationEmail(email: string) {
+  try {
+    const baseUrl = getAuthUrl()
+    const response = await fetch(`${baseUrl}/v1/user/email/send-verification-email`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ email }),
+    })
+    
+    const text = await response.text()
+    let data
+    try {
+      data = JSON.parse(text)
+    } catch {
+      return { error: new Error('Failed to resend verification email') }
+    }
+    
+    if (!response.ok) {
+      return { error: new Error(data?.message || data?.error || 'Failed to resend verification') }
+    }
+    
+    return { error: null }
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err : new Error('Failed to resend verification') }
+  }
+}
+
 export async function getAccessToken(): Promise<string | null> {
   // Try to refresh session if needed
   if (!currentSession) {
