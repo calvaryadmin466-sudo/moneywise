@@ -57,7 +57,7 @@ function getBrowser() {
 }
 
 export function PWAProvider({ children }: { children: React.ReactNode }) {
-  const { isInstallable, isInstalled, isOnline, installApp } = usePWA();
+  const { isInstallable, isInstalled, isOnline, installApp, deferredPrompt } = usePWA();
   const [showInstallPopup, setShowInstallPopup] = React.useState(false);
   const [showOfflineBanner, setShowOfflineBanner] = React.useState(false);
   const [platform, setPlatform] = React.useState<string>('other');
@@ -96,13 +96,30 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
   };
 
   const handleInstall = async () => {
-    if (isInstallable) {
+    if (isInstallable && deferredPrompt) {
       await installApp();
       setShowInstallPopup(false);
     } else {
+      // Chrome doesn't show install prompt - show manual instructions
       setInstallStep(1);
     }
   };
+
+  // Debug info for Chrome DevTools
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      console.log('PWA Debug:', {
+        isInstallable,
+        isInstalled,
+        userAgent: navigator.userAgent,
+        platform,
+        browser,
+        hasDeferredPrompt: !!deferredPrompt,
+        manifestLink: document.querySelector('link[rel="manifest"]')?.getAttribute('href'),
+        serviceWorker: 'serviceWorker' in navigator,
+      });
+    }
+  }, [isInstallable, isInstalled, platform, browser, deferredPrompt]);
 
   const renderInstallInstructions = () => {
     if (platform === 'ios') {
@@ -160,22 +177,25 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-blue-400">
             <Monitor className="h-5 w-5" />
-            <span className="font-medium">Windows</span>
+            <span className="font-medium">Windows (Chrome)</span>
           </div>
           <ol className="space-y-2 text-sm text-gray-300">
             <li className="flex items-start gap-2">
               <span className="bg-cyan-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs flex-shrink-0">1</span>
-              <span>Look for the <strong>⊕ Install</strong> icon in Chrome/Edge's address bar</span>
+              <span>Click the <strong>⋮ menu</strong> (three dots) in top-right of Chrome</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="bg-cyan-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs flex-shrink-0">2</span>
-              <span>Click <strong>"Install MoneyWise"</strong></span>
+              <span>Look for <strong>"Install MoneyWise..."</strong> or <strong>"More tools" → "Create shortcut"</strong></span>
             </li>
-            <li className="flex items-start gap-2">
+            <li className="flex items-center gap-2">
               <span className="bg-cyan-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs flex-shrink-0">3</span>
-              <span>App will appear in Start Menu and Desktop</span>
+              <span>Click <strong>"Install"</strong> and check <strong>"Open as window"</strong></span>
             </li>
           </ol>
+          <p className="text-xs text-gray-500 mt-2">
+            Note: Chrome only shows install for sites with HTTPS and valid PWA manifest
+          </p>
         </div>
       );
     }

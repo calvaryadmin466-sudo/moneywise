@@ -92,7 +92,7 @@ export default function ProfilePage() {
     const result = await gqlRequest(
       `
       mutation($id: uuid!, $display_name: String, $email: String, $avatar_url: String, $currency_preference: String, $country: String, $phone: String) {
-        insert_user_profiles(objects: [{
+        insert_user_profiles_one(object: {
           id: $id,
           display_name: $display_name,
           email: $email,
@@ -100,8 +100,8 @@ export default function ProfilePage() {
           currency_preference: $currency_preference,
           country: $country,
           phone: $phone
-        }], on_conflict: { constraint: user_profiles_pkey, update_columns: [display_name, avatar_url, currency_preference, country, phone] }) {
-          affected_rows
+        }, on_conflict: { constraint: user_profiles_id_key, update_columns: [display_name, email, avatar_url, currency_preference, country, phone] }) {
+          id
         }
       }
     `,
@@ -200,11 +200,11 @@ export default function ProfilePage() {
         await gqlRequest(
           `
           mutation($id: uuid!, $avatar_url: String) {
-            insert_user_profiles(objects: [{
+            insert_user_profiles_one(object: {
               id: $id,
               avatar_url: $avatar_url
-            }], on_conflict: { constraint: user_profiles_pkey, update_columns: [avatar_url] }) {
-              affected_rows
+            }, on_conflict: { constraint: user_profiles_id_key, update_columns: [avatar_url] }) {
+              id
             }
           }
         `,

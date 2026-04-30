@@ -116,6 +116,31 @@ CREATE POLICY "Users can only see own profile" ON user_profiles
 CREATE POLICY "Users can only see own activity" ON user_activity 
   FOR ALL USING (user_id::text = current_setting('hasura.user.id', true));
 
+-- User Assets table (cash, bank, mobile money, stocks)
+CREATE TABLE IF NOT EXISTS user_assets (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('cash', 'bank', 'mobile_money', 'stocks', 'other')),
+  name TEXT NOT NULL,
+  balance NUMERIC(15, 2) DEFAULT 0,
+  currency TEXT DEFAULT 'TZS',
+  account_number TEXT,
+  bank_name TEXT,
+  broker_name TEXT,
+  description TEXT,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Enable RLS on assets
+ALTER TABLE user_assets ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for user_assets
+DROP POLICY IF EXISTS "Users can only see own assets" ON user_assets;
+CREATE POLICY "Users can only see own assets" ON user_assets 
+  FOR ALL USING (user_id::text = current_setting('hasura.user.id', true));
+
 -- Create function to update last_seen_at
 CREATE OR REPLACE FUNCTION update_user_last_seen()
 RETURNS TRIGGER AS $$
@@ -128,6 +153,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create trigger to update last_seen on activity
+DROP TRIGGER IF EXISTS update_last_seen_trigger ON user_activity;
 CREATE TRIGGER update_last_seen_trigger
   AFTER INSERT ON user_activity
   FOR EACH ROW

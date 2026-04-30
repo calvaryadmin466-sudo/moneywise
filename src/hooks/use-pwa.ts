@@ -92,7 +92,7 @@ export function usePWA() {
     }
   };
 
-  return { ...state, installApp };
+  return { ...state, deferredPrompt: state.deferredPrompt, installApp };
 }
 
 // Request notification permission
