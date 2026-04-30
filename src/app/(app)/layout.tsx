@@ -17,6 +17,7 @@ import {
   Cog,
   User,
   LogOut,
+  Database,
 } from "lucide-react";
 import {
   SidebarProvider,
@@ -149,6 +150,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/profile') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
                 <User className="h-5 w-5" />
                 <span className="font-medium">Profile</span>
+              </div>
+            </Link>
+            <Link href="/data" className="block">
+              <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/data') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
+                <Database className="h-5 w-5" />
+                <span className="font-medium">My Data</span>
               </div>
             </Link>
           </nav>
