@@ -1,13 +1,62 @@
 import { createClient } from '@nhost/nhost-js'
+import { createAPIClient } from '@nhost/nhost-js/auth'
 
 export const nhost = createClient({
   subdomain: process.env.NHOST_SUBDOMAIN || '',
   region: process.env.NHOST_REGION || '',
 })
 
+const authClient = createAPIClient(process.env.NHOST_AUTH_URL || '')
+
+// Auth functions using Nhost auth
+export async function signIn(email: string, password: string) {
+  try {
+    const result = await authClient.signInEmailPassword({ email, password })
+    return { data: result.body, error: null }
+  } catch (err: unknown) {
+    return { data: null, error: err instanceof Error ? err : new Error('Sign in failed') }
+  }
+}
+
+export async function signUp(email: string, password: string) {
+  try {
+    const result = await authClient.signUpEmailPassword({ email, password })
+    return { data: result.body, error: null }
+  } catch (err: unknown) {
+    return { data: null, error: err instanceof Error ? err : new Error('Sign up failed') }
+  }
+}
+
+export async function signOut() {
+  try {
+    await authClient.signOut()
+    return { error: null }
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err : new Error('Sign out failed') }
+  }
+}
+
+export async function getAccessToken(): Promise<string | null> {
+  try {
+    const session = await authClient.getSession()
+    return session?.body?.session?.accessToken || null
+  } catch {
+    return null
+  }
+}
+
+export async function getUser() {
+  try {
+    const session = await authClient.getSession()
+    return session?.body?.session?.user || null
+  } catch {
+    return null
+  }
+}
+
 export async function gqlRequest<T = unknown>(query: string, variables?: Record<string, unknown>): Promise<{ data?: T; error?: string }> {
   try {
-    const token = await nhost.auth.getAccessToken()
+    const token = await getAccessToken()
     const response = await fetch(process.env.NHOST_GRAPHQL_URL!, {
       method: 'POST',
       headers: {
@@ -24,18 +73,6 @@ export async function gqlRequest<T = unknown>(query: string, variables?: Record<
   } catch (err: unknown) {
     return { error: err instanceof Error ? err.message : 'Unknown error' }
   }
-}
-
-export async function signIn(email: string, password: string) {
-  return nhost.auth.signIn({ email, password })
-}
-
-export async function signUp(email: string, password: string) {
-  return nhost.auth.signUp({ email, password })
-}
-
-export async function signOut() {
-  return nhost.auth.signOut()
 }
 
 export const formatCurrency = (amount: number, currency: string = 'TZS'): string => {
