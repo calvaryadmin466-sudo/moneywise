@@ -1,35 +1,43 @@
 // Simple in-memory storage for session
 let currentSession: { accessToken: string; user: { id: string; email: string } } | null = null
 
-// Get base auth URL (remove /v1 if present)
-const getAuthBaseUrl = () => {
+// Get base auth URL - try different formats
+const getAuthUrl = () => {
   const url = process.env.NHOST_AUTH_URL || ''
-  return url.replace(/\/v1\/?$/, '')
+  // First try the base subdomain URL
+  const baseUrl = `https://${process.env.NHOST_SUBDOMAIN}.auth.${process.env.NHOST_REGION}.nhost.run`
+  return baseUrl
 }
 
 // Auth functions using direct fetch to Nhost Auth API
 export async function signIn(email: string, password: string) {
   try {
-    const baseUrl = getAuthBaseUrl()
-    const response = await fetch(`${baseUrl}/signin/email-password`, {
+    const baseUrl = getAuthUrl()
+    const url = `${baseUrl}/v1/signin/email-password`
+    console.log('SignIn URL:', url)
+    
+    const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
       body: JSON.stringify({ email, password }),
     })
     
     const text = await response.text()
-    console.log('SignIn response:', text.substring(0, 200))
+    console.log('SignIn status:', response.status)
+    console.log('SignIn response:', text.substring(0, 500))
     
     let data
     try {
       data = JSON.parse(text)
     } catch {
-      console.error('Failed to parse JSON:', text.substring(0, 500))
-      return { data: null, error: new Error('Server error - please try again') }
+      return { data: null, error: new Error(`Server error (${response.status}): ${text.substring(0, 100)}`) }
     }
     
     if (!response.ok) {
-      return { data: null, error: new Error(data?.message || data?.error || 'Sign in failed') }
+      return { data: null, error: new Error(data?.message || data?.error || `Sign in failed (${response.status})`) }
     }
     
     if (data?.session) {
@@ -48,26 +56,33 @@ export async function signIn(email: string, password: string) {
 
 export async function signUp(email: string, password: string) {
   try {
-    const baseUrl = getAuthBaseUrl()
-    const response = await fetch(`${baseUrl}/signup/email-password`, {
+    const baseUrl = getAuthUrl()
+    const url = `${baseUrl}/v1/signup/email-password`
+    console.log('SignUp URL:', url)
+    
+    const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
       body: JSON.stringify({ email, password }),
     })
     
     const text = await response.text()
-    console.log('SignUp response:', text.substring(0, 200))
+    console.log('SignUp status:', response.status)
+    console.log('SignUp response:', text.substring(0, 500))
     
     let data
     try {
       data = JSON.parse(text)
-    } catch {
-      console.error('Failed to parse JSON:', text.substring(0, 500))
-      return { data: null, error: new Error('Server error - please try again') }
+    } catch (e) {
+      console.error('JSON parse error:', e)
+      return { data: null, error: new Error(`Server error (${response.status}): ${text.substring(0, 100)}`) }
     }
     
     if (!response.ok) {
-      return { data: null, error: new Error(data?.message || data?.error || 'Sign up failed') }
+      return { data: null, error: new Error(data?.message || data?.error || `Sign up failed (${response.status})`) }
     }
     
     return { data, error: null }
@@ -100,8 +115,8 @@ export async function getUser() {
 
 async function refreshSession() {
   try {
-    const baseUrl = getAuthBaseUrl()
-    const response = await fetch(`${baseUrl}/token`, {
+    const baseUrl = getAuthUrl()
+    const response = await fetch(`${baseUrl}/v1/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include'
