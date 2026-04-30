@@ -1,5 +1,31 @@
-// Simple in-memory storage for session
-let currentSession: { accessToken: string; user: { id: string; email: string } } | null = null
+// Use localStorage for persistent session
+const SESSION_KEY = 'nhost_session'
+
+function getSession() {
+  if (typeof window === 'undefined') return null
+  try {
+    const stored = localStorage.getItem(SESSION_KEY)
+    if (stored) {
+      return JSON.parse(stored) as { accessToken: string; user: { id: string; email: string } }
+    }
+  } catch {
+    // ignore
+  }
+  return null
+}
+
+function setSession(session: { accessToken: string; user: { id: string; email: string } } | null) {
+  if (typeof window === 'undefined') return
+  try {
+    if (session) {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+    } else {
+      localStorage.removeItem(SESSION_KEY)
+    }
+  } catch {
+    // ignore
+  }
+}
 
 // Hardcoded Nhost config (fallback if env vars not loaded)
 const NHOST_CONFIG = {
@@ -46,10 +72,10 @@ export async function signIn(email: string, password: string) {
     }
     
     if (data?.session) {
-      currentSession = {
+      setSession({
         accessToken: data.session.accessToken,
         user: data.session.user
-      }
+      })
     }
     
     return { data, error: null }
@@ -98,7 +124,7 @@ export async function signUp(email: string, password: string) {
 }
 
 export async function signOut() {
-  currentSession = null
+  setSession(null)
   return { error: null }
 }
 
@@ -133,42 +159,20 @@ export async function resendVerificationEmail(email: string) {
 }
 
 export async function getAccessToken(): Promise<string | null> {
-  // Try to refresh session if needed
-  if (!currentSession) {
-    await refreshSession()
-  }
-  return currentSession?.accessToken || null
+  const session = getSession()
+  return session?.accessToken || null
 }
 
 export async function getUser() {
-  // Try to refresh session if needed
-  if (!currentSession) {
-    await refreshSession()
-  }
-  return currentSession?.user || null
+  const session = getSession()
+  return session?.user || null
 }
 
+// Note: Nhost token refresh requires cookies, which we're not using
+// This function is kept for compatibility but session is now stored in localStorage
 async function refreshSession() {
-  try {
-    const baseUrl = getAuthUrl()
-    const response = await fetch(`${baseUrl}/v1/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include'
-    })
-    
-    if (response.ok) {
-      const data = await response.json()
-      if (data?.session) {
-        currentSession = {
-          accessToken: data.session.accessToken,
-          user: data.session.user
-        }
-      }
-    }
-  } catch {
-    // Silent fail - user is not logged in
-  }
+  // Session is loaded from localStorage in getSession()
+  // No need for token refresh with this implementation
 }
 
 export async function gqlRequest<T = unknown>(query: string, variables?: Record<string, unknown>): Promise<{ data?: T; error?: string }> {
