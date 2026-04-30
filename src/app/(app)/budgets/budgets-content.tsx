@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { supabase, Transaction, Budget, CATEGORIES, formatCurrency, Currency } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase-browser";
+import { Transaction, Budget, CATEGORIES, formatCurrency, Currency } from "@/lib/supabase";
 import { useSearchParams } from "next/navigation";
 
 export default function BudgetsContent() {
@@ -35,6 +36,7 @@ export default function BudgetsContent() {
 
   async function fetchData() {
     setLoading(true);
+    const supabase = createClient();
     const [budgetRes, transRes] = await Promise.all([
       supabase.from("budgets").select("*"),
       supabase.from("transactions").select("*").eq("type", "expense"),
@@ -45,6 +47,7 @@ export default function BudgetsContent() {
   }
 
   async function addBudget() {
+    const supabase = createClient();
     const { error } = await supabase.from("budgets").insert([{
       category: formData.category,
       monthly_limit: Number(formData.monthly_limit),
@@ -58,6 +61,7 @@ export default function BudgetsContent() {
   }
 
   async function deleteBudget(id: string) {
+    const supabase = createClient();
     await supabase.from("budgets").delete().eq("id", id);
     fetchData();
   }

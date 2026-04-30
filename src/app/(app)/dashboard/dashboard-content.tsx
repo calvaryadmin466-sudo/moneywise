@@ -28,7 +28,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { supabase, Transaction, Budget, Goal, CATEGORIES, formatCurrency, Currency } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase-browser";
+import { Transaction, Budget, Goal, CATEGORIES, formatCurrency, Currency } from "@/lib/supabase";
 import { useSearchParams } from "next/navigation";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
@@ -53,6 +54,7 @@ export default function DashboardContent() {
 
   async function fetchData() {
     setLoading(true);
+    const supabase = createClient();
     const [transRes, budgetRes, goalsRes] = await Promise.all([
       supabase.from("transactions").select("*").order("date", { ascending: false }),
       supabase.from("budgets").select("*"),
@@ -67,6 +69,7 @@ export default function DashboardContent() {
 
   async function addCheckInTransaction() {
     if (!checkInAmount) return;
+    const supabase = createClient();
     const { error } = await supabase.from("transactions").insert([{
       type: "expense",
       amount: Number(checkInAmount),

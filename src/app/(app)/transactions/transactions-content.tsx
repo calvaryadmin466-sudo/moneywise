@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { supabase, Transaction, CATEGORIES, formatCurrency, Currency } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase-browser";
+import { Transaction, CATEGORIES, formatCurrency, Currency } from "@/lib/supabase";
 import { useSearchParams } from "next/navigation";
 
 export default function TransactionsContent() {
@@ -41,6 +42,7 @@ export default function TransactionsContent() {
 
   async function fetchTransactions() {
     setLoading(true);
+    const supabase = createClient();
     const { data } = await supabase
       .from("transactions")
       .select("*")
@@ -50,6 +52,7 @@ export default function TransactionsContent() {
   }
 
   async function addTransaction() {
+    const supabase = createClient();
     const { error } = await supabase.from("transactions").insert([{
       ...formData,
       amount: Number(formData.amount),
@@ -69,6 +72,7 @@ export default function TransactionsContent() {
 
   async function updateTransaction() {
     if (!editingTransaction) return;
+    const supabase = createClient();
     const { error } = await supabase
       .from("transactions")
       .update({
@@ -84,6 +88,7 @@ export default function TransactionsContent() {
   }
 
   async function deleteTransaction(id: string) {
+    const supabase = createClient();
     const { error } = await supabase.from("transactions").delete().eq("id", id);
     if (!error) fetchTransactions();
   }

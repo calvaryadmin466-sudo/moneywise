@@ -5,7 +5,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
-import { supabase, CATEGORIES, type Transaction } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase-browser";
+import { CATEGORIES, type Transaction } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -82,6 +83,7 @@ export function AddTransactionSheet({
   }, [isOpen, form]);
 
   async function onSubmit(data: TransactionFormValues) {
+    const supabase = createClient();
     const { error } = await supabase.from("transactions").insert([{
       type: data.type,
       amount: data.amount,

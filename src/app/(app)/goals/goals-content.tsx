@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { supabase, Goal, formatCurrency, Currency } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase-browser";
+import { Goal, formatCurrency, Currency } from "@/lib/supabase";
 import { useSearchParams } from "next/navigation";
 
 export default function GoalsContent() {
@@ -35,12 +36,14 @@ export default function GoalsContent() {
 
   async function fetchGoals() {
     setLoading(true);
+    const supabase = createClient();
     const { data } = await supabase.from("goals").select("*").order("created_at", { ascending: false });
     if (data) setGoals(data);
     setLoading(false);
   }
 
   async function addGoal() {
+    const supabase = createClient();
     const { error } = await supabase.from("goals").insert([{
       name: formData.name,
       target_amount: Number(formData.target_amount),
@@ -54,12 +57,14 @@ export default function GoalsContent() {
   }
 
   async function deleteGoal(id: string) {
+    const supabase = createClient();
     await supabase.from("goals").delete().eq("id", id);
     fetchGoals();
   }
 
   async function addFunds() {
     if (!selectedGoal) return;
+    const supabase = createClient();
     const newAmount = Number(selectedGoal.saved_amount) + Number(contributeAmount);
     const { error } = await supabase
       .from("goals")

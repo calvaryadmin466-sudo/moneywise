@@ -10,7 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { supabase, Debt, formatCurrency, Currency } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase-browser";
+import { Debt, formatCurrency, Currency } from "@/lib/supabase";
 import { useSearchParams } from "next/navigation";
 
 export default function DebtsContent() {
@@ -34,12 +35,14 @@ export default function DebtsContent() {
 
   async function fetchDebts() {
     setLoading(true);
+    const supabase = createClient();
     const { data } = await supabase.from("debts").select("*").order("created_at", { ascending: false });
     if (data) setDebts(data);
     setLoading(false);
   }
 
   async function addDebt() {
+    const supabase = createClient();
     const { error } = await supabase.from("debts").insert([{
       name: formData.name,
       amount: Number(formData.amount),
@@ -54,11 +57,13 @@ export default function DebtsContent() {
   }
 
   async function togglePaid(id: string, currentStatus: boolean) {
+    const supabase = createClient();
     await supabase.from("debts").update({ is_paid: !currentStatus }).eq("id", id);
     fetchDebts();
   }
 
   async function deleteDebt(id: string) {
+    const supabase = createClient();
     await supabase.from("debts").delete().eq("id", id);
     fetchDebts();
   }
