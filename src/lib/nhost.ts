@@ -1,14 +1,16 @@
 // Simple in-memory storage for session
 let currentSession: { accessToken: string; user: { id: string; email: string } } | null = null
 
+// Hardcoded Nhost config (fallback if env vars not loaded)
+const NHOST_CONFIG = {
+  subdomain: 'wxtreqbjcljlcoobxoea',
+  region: 'eu-central-1',
+}
+
 // Get base auth URL - use public env vars for browser
 const getAuthUrl = () => {
-  const subdomain = process.env.NEXT_PUBLIC_NHOST_SUBDOMAIN
-  const region = process.env.NEXT_PUBLIC_NHOST_REGION
-  if (!subdomain || !region) {
-    console.error('Missing Nhost config:', { subdomain, region })
-    throw new Error('Nhost configuration missing')
-  }
+  const subdomain = process.env.NEXT_PUBLIC_NHOST_SUBDOMAIN || NHOST_CONFIG.subdomain
+  const region = process.env.NEXT_PUBLIC_NHOST_REGION || NHOST_CONFIG.region
   return `https://${subdomain}.auth.${region}.nhost.run`
 }
 
@@ -142,10 +144,8 @@ async function refreshSession() {
 export async function gqlRequest<T = unknown>(query: string, variables?: Record<string, unknown>): Promise<{ data?: T; error?: string }> {
   try {
     const token = await getAccessToken()
-    const graphqlUrl = process.env.NEXT_PUBLIC_NHOST_GRAPHQL_URL
-    if (!graphqlUrl) {
-      throw new Error('GraphQL URL not configured')
-    }
+    const graphqlUrl = process.env.NEXT_PUBLIC_NHOST_GRAPHQL_URL || 
+      `https://${NHOST_CONFIG.subdomain}.graphql.${NHOST_CONFIG.region}.nhost.run/v1`
     const response = await fetch(graphqlUrl, {
       method: 'POST',
       headers: {
