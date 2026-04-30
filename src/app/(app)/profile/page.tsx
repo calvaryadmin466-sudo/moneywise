@@ -8,8 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { getUser, gqlRequest, signOut } from "@/lib/nhost";
-import { Camera, LogOut, User, Mail, Globe, DollarSign } from "lucide-react";
+import { getUser, gqlRequest, signOut, getAccessToken } from "@/lib/nhost";
+import { Camera, LogOut, User, Mail, Globe, DollarSign, Loader2, Upload } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const CURRENCIES = [
@@ -41,6 +41,8 @@ export default function ProfilePage() {
   const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = React.useState(false);
+  const [uploadingImage, setUploadingImage] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [profile, setProfile] = React.useState({
     display_name: "",
     email: "",
@@ -134,11 +136,118 @@ export default function ProfilePage() {
     router.push("/login");
   }
 
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type and size
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid file",
+        description: "Please select an image file (JPEG, PNG, GIF)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Image must be less than 2MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploadingImage(true);
+
+    try {
+      const user = await getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Convert to base64 for immediate preview
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = reader.result as string;
+        
+        // Update local state for preview
+        setProfile(prev => ({ ...prev, avatar_url: base64String }));
+
+        // Upload to Nhost storage
+        const token = await getAccessToken();
+        const storageUrl = process.env.NEXT_PUBLIC_NHOST_STORAGE_URL || 
+          `https://wxtreqbjcljlcoobxoea.storage.eu-central-1.nhost.run/v1`;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const uploadRes = await fetch(`${storageUrl}/files`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        if (!uploadRes.ok) {
+          throw new Error('Failed to upload image');
+        }
+
+        const uploadData = await uploadRes.json();
+        const imageUrl = `${storageUrl}/files/${uploadData.id}`;
+
+        // Update profile with new image URL
+        await gqlRequest(
+          `
+          mutation($id: uuid!, $avatar_url: String) {
+            insert_user_profiles(objects: [{
+              id: $id,
+              avatar_url: $avatar_url
+            }], on_conflict: { constraint: user_profiles_pkey, update_columns: [avatar_url] }) {
+              affected_rows
+            }
+          }
+        `,
+          { id: user.id, avatar_url: imageUrl }
+        );
+
+        setProfile(prev => ({ ...prev, avatar_url: imageUrl }));
+        
+        toast({
+          title: "Success",
+          description: "Profile picture updated!",
+        });
+      };
+
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Failed to upload image",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
+  function triggerFileInput() {
+    fileInputRef.current?.click();
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0f172a] p-4 md:p-8">
       <div className="max-w-2xl mx-auto">
         <Card className="glass-card border-cyan-500/30">
           <CardHeader className="text-center">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleImageUpload}
+              accept="image/*"
+              className="hidden"
+            />
             <div className="relative mx-auto mb-4">
               <Avatar className="h-24 w-24 ring-4 ring-cyan-500/30">
                 <AvatarImage src={profile.avatar_url} />
@@ -146,8 +255,16 @@ export default function ProfilePage() {
                   <User className="h-10 w-10 text-white" />
                 </AvatarFallback>
               </Avatar>
-              <button className="absolute bottom-0 right-0 p-2 bg-cyan-500 rounded-full text-white hover:bg-cyan-400">
-                <Camera className="h-4 w-4" />
+              <button 
+                onClick={triggerFileInput}
+                disabled={uploadingImage}
+                className="absolute bottom-0 right-0 p-2 bg-cyan-500 rounded-full text-white hover:bg-cyan-400 disabled:opacity-50"
+              >
+                {uploadingImage ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Camera className="h-4 w-4" />
+                )}
               </button>
             </div>
             <CardTitle className="text-2xl font-bold text-white">Profile</CardTitle>

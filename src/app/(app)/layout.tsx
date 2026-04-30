@@ -8,7 +8,6 @@ import {
   LayoutDashboard,
   Settings,
   AreaChart,
-  Lightbulb,
   Plus,
   Wallet,
   PiggyBank,
@@ -198,14 +197,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex items-center gap-3">
             <AIFinancialAdvisorV2 />
-            <Button 
-              variant="outline" 
-              onClick={() => setInsightsOpen(true)}
-              className="border-white/20 bg-white/5 hover:bg-white/10 text-gray-300"
-            >
-              <Lightbulb className="mr-2 h-4 w-4 text-amber-400" />
-              Insights
-            </Button>
           </div>
         </header>
         {children}

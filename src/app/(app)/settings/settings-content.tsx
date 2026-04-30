@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Settings, Moon, Sun, Wallet, Shield, Bell, Laptop, ExternalLink } from "lucide-react";
+import { Settings, Moon, Sun, Wallet, Shield, Bell, Laptop, ExternalLink, Mail, Phone, User, Github } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -162,9 +162,34 @@ export default function SettingsContent() {
             </div>
             <Badge variant="secondary">v1.0</Badge>
           </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          
+          <div className="border-t border-border pt-4 space-y-3">
+            <p className="font-medium text-sm">Created by</p>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <User className="h-4 w-4 text-cyan-400" />
+              <span>Straton Florentin Tesha</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Mail className="h-4 w-4 text-cyan-400" />
+              <a href="mailto:stratonflorentin@gmail.com" className="hover:text-cyan-400 transition-colors">
+                stratonflorentin@gmail.com
+              </a>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Phone className="h-4 w-4 text-cyan-400" />
+              <span>0627990768, 0775690768</span>
+            </div>
+          </div>
+
+          <div className="border-t border-border pt-4">
+            <p className="text-xs text-muted-foreground">
+              For feedback, suggestions, or support, please contact us using the information above.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 text-sm text-muted-foreground border-t border-border pt-4">
             <ExternalLink className="h-4 w-4" />
-            Built with Next.js, Supabase, and Tailwind CSS
+            Built with Next.js, Nhost, and Tailwind CSS
           </div>
         </CardContent>
       </Card>
