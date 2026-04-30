@@ -34,6 +34,7 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
 import { AddTransactionSheet } from "@/components/dashboard/add-transaction-sheet";
 import { SpendingInsightsDialog } from "@/components/dashboard/spending-insights-dialog";
+import { AIFinancialAdvisor } from "@/components/dashboard/ai-financial-advisor";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { nhost, gqlRequest, signOut } from "@/lib/nhost";
 import { Transaction } from "@/lib/nhost";
@@ -182,6 +183,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <h1 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">{capitalizedTitle}</h1>
           </div>
           <div className="flex items-center gap-3">
+            <AIFinancialAdvisor />
             <Button 
               variant="outline" 
               onClick={() => setInsightsOpen(true)}
