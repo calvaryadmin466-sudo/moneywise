@@ -5,8 +5,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
-import { createClient } from "@/lib/supabase-browser";
-import { CATEGORIES, type Transaction } from "@/lib/supabase";
+import { nhost, gqlRequest, CATEGORIES } from "@/lib/nhost";
+import type { Transaction } from "@/lib/nhost";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -83,20 +83,21 @@ export function AddTransactionSheet({
   }, [isOpen, form]);
 
   async function onSubmit(data: TransactionFormValues) {
-    const supabase = createClient();
-    const { error } = await supabase.from("transactions").insert([{
-      type: data.type,
-      amount: data.amount,
-      category: data.category,
-      date: format(data.date, "yyyy-MM-dd"),
-      note: data.notes || null,
-      is_recurring: false,
-    }]);
+    const user = await nhost.auth.getUser();
+    const userId = user?.id;
+    if (!userId) return;
     
-    if (error) {
+    const result = await gqlRequest(
+      `mutation($type: String!, $amount: numeric!, $category: String!, $date: date!, $note: String, $isRecurring: Boolean!, $userId: uuid!) {
+        insert_transactions(objects: [{type: $type, amount: $amount, category: $category, date: $date, note: $note, is_recurring: $isRecurring, user_id: $userId}]) { affected_rows }
+      }`,
+      { type: data.type, amount: data.amount, category: data.category, date: format(data.date, "yyyy-MM-dd"), note: data.notes || null, isRecurring: false, userId }
+    );
+    
+    if (result.error) {
       toast({
         title: "Error",
-        description: error.message,
+        description: result.error,
         variant: "destructive",
       });
       return;

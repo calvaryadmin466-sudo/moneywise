@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase-browser";
+import { signIn } from "@/lib/nhost";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,36 +25,34 @@ export default function LoginPage() {
     setLoading(true);
     console.log("Starting login...");
 
-    const supabase = createClient();
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    console.log("Login response:", { data, error });
-
-    if (error) {
-      console.error("Login error:", error);
+    try {
+      const result = await signIn(email, password);
+      
+      if (result.error) {
+        console.error("Login error:", result.error);
+        toast({
+          title: "Error",
+          description: result.error.message,
+          variant: "destructive",
+        });
+      } else {
+        console.log("Login successful");
+        toast({
+          title: "Success",
+          description: "Logged in successfully!",
+        });
+        
+        setTimeout(() => {
+          window.location.href = "/dashboard";
+        }, 500);
+      }
+    } catch (err: unknown) {
+      console.error("Login error:", err);
       toast({
         title: "Error",
-        description: error.message,
+        description: err instanceof Error ? err.message : "Login failed",
         variant: "destructive",
       });
-    } else {
-      console.log("Login successful, checking session...");
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log("Session after login:", session);
-      
-      toast({
-        title: "Success",
-        description: "Logged in successfully!",
-      });
-      
-      // Small delay to ensure cookies are set
-      setTimeout(() => {
-        console.log("Redirecting to dashboard...");
-        window.location.href = "/dashboard";
-      }, 500);
     }
 
     setLoading(false);

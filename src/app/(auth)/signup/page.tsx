@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase-browser";
+import { signUp } from "@/lib/nhost";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,25 +44,28 @@ export default function SignupPage() {
 
     setLoading(true);
 
-    const supabase = createClient();
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
+    try {
+      const result = await signUp(email, password);
 
-    if (error) {
+      if (result.error) {
+        toast({
+          title: "Error",
+          description: result.error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Account created! Please check your email to verify, then sign in.",
+        });
+        window.location.href = "/login";
+      }
+    } catch (err: unknown) {
       toast({
         title: "Error",
-        description: error.message,
+        description: err instanceof Error ? err.message : "Signup failed",
         variant: "destructive",
       });
-    } else {
-      toast({
-        title: "Success",
-        description: "Account created! Please check your email to verify, then sign in.",
-      });
-      // Redirect to login page
-      window.location.href = "/login";
     }
 
     setLoading(false);

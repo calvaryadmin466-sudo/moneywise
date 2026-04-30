@@ -35,8 +35,8 @@ import { Logo } from "@/components/logo";
 import { AddTransactionSheet } from "@/components/dashboard/add-transaction-sheet";
 import { SpendingInsightsDialog } from "@/components/dashboard/spending-insights-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { createClient } from "@/lib/supabase-browser";
-import { Transaction } from "@/lib/supabase";
+import { nhost, gqlRequest, signOut } from "@/lib/nhost";
+import { Transaction } from "@/lib/nhost";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -49,10 +49,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // Check auth on mount
   React.useEffect(() => {
     async function checkAuth() {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
+      const user = await nhost.auth.getUser();
       
-      if (!session) {
+      if (!user) {
         router.push('/login');
       } else {
         setIsLoading(false);
@@ -64,14 +63,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // Fetch transactions for insights dialog
   React.useEffect(() => {
     async function fetchTransactions() {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .order('date', { ascending: false });
+      const user = await nhost.auth.getUser();
+      const userId = user?.id;
+      if (!userId) return;
       
-      if (!error && data) {
-        setTransactions(data);
+      const result = await gqlRequest(`query { transactions(where: {user_id: {_eq: "${userId}"}}, order_by: {date: desc}) { id user_id type amount category date note is_recurring created_at } }`);
+      
+      if (result.data?.transactions) {
+        setTransactions(result.data.transactions);
       }
     }
     fetchTransactions();
@@ -164,8 +163,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
             <button
               onClick={async () => {
-                const supabase = createClient();
-                await supabase.auth.signOut();
+                await signOut();
                 router.push('/login');
               }}
               className="p-2 rounded-lg hover:bg-white/10 text-gray-400 hover:text-red-400 transition-colors"

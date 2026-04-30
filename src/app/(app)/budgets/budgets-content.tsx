@@ -10,8 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { createClient } from "@/lib/supabase-browser";
-import { Transaction, Budget, CATEGORIES, formatCurrency, Currency } from "@/lib/supabase";
+import { nhost, gqlRequest, formatCurrency, Currency, Transaction, Budget, CATEGORIES } from "@/lib/nhost";
 import { useSearchParams } from "next/navigation";
 
 export default function BudgetsContent() {
@@ -36,24 +35,32 @@ export default function BudgetsContent() {
 
   async function fetchData() {
     setLoading(true);
-    const supabase = createClient();
+    const user = await nhost.auth.getUser();
+    const userId = user?.id;
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
     const [budgetRes, transRes] = await Promise.all([
-      supabase.from("budgets").select("*"),
-      supabase.from("transactions").select("*").eq("type", "expense"),
+      gqlRequest(`query { budgets(where: {user_id: {_eq: "${userId}"}}, order_by: {created_at: desc}) { id user_id category monthly_limit month created_at } }`),
+      gqlRequest(`query { transactions(where: {type: {_eq: "expense"}, user_id: {_eq: "${userId}"}}, order_by: {date: desc}) { id user_id type amount category date note is_recurring created_at } }`),
     ]);
-    if (budgetRes.data) setBudgets(budgetRes.data);
-    if (transRes.data) setTransactions(transRes.data);
+    if (budgetRes.data?.budgets) setBudgets(budgetRes.data.budgets);
+    if (transRes.data?.transactions) setTransactions(transRes.data.transactions);
     setLoading(false);
   }
 
   async function addBudget() {
-    const supabase = createClient();
-    const { error } = await supabase.from("budgets").insert([{
-      category: formData.category,
-      monthly_limit: Number(formData.monthly_limit),
-      month: formData.month,
-    }]);
-    if (!error) {
+    const user = await nhost.auth.getUser();
+    const userId = user?.id;
+    if (!userId) return;
+    const result = await gqlRequest(
+      `mutation($category: String!, $monthly_limit: numeric!, $month: String!, $userId: uuid!) {
+        insert_budgets(objects: [{category: $category, monthly_limit: $monthly_limit, month: $month, user_id: $userId}]) { affected_rows }
+      }`,
+      { category: formData.category, monthly_limit: Number(formData.monthly_limit), month: formData.month, userId }
+    );
+    if (!result.error) {
       setIsOpen(false);
       fetchData();
       setFormData({ category: "Food", monthly_limit: "", month: currentMonth });
@@ -61,8 +68,10 @@ export default function BudgetsContent() {
   }
 
   async function deleteBudget(id: string) {
-    const supabase = createClient();
-    await supabase.from("budgets").delete().eq("id", id);
+    await gqlRequest(
+      `mutation($id: uuid!) { delete_budgets(where: {id: {_eq: $id}}) { affected_rows } }`,
+      { id }
+    );
     fetchData();
   }
 

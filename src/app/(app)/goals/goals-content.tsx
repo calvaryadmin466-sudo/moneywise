@@ -9,8 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { createClient } from "@/lib/supabase-browser";
-import { Goal, formatCurrency, Currency } from "@/lib/supabase";
+import { nhost, gqlRequest, formatCurrency, Currency, Goal } from "@/lib/nhost";
 import { useSearchParams } from "next/navigation";
 
 export default function GoalsContent() {
@@ -36,20 +35,28 @@ export default function GoalsContent() {
 
   async function fetchGoals() {
     setLoading(true);
-    const supabase = createClient();
-    const { data } = await supabase.from("goals").select("*").order("created_at", { ascending: false });
-    if (data) setGoals(data);
+    const user = await nhost.auth.getUser();
+    const userId = user?.id;
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+    const result = await gqlRequest(`query { goals(where: {user_id: {_eq: "${userId}"}}, order_by: {created_at: desc}) { id user_id name target_amount saved_amount deadline created_at } }`);
+    if (result.data?.goals) setGoals(result.data.goals);
     setLoading(false);
   }
 
   async function addGoal() {
-    const supabase = createClient();
-    const { error } = await supabase.from("goals").insert([{
-      name: formData.name,
-      target_amount: Number(formData.target_amount),
-      deadline: formData.deadline || null,
-    }]);
-    if (!error) {
+    const user = await nhost.auth.getUser();
+    const userId = user?.id;
+    if (!userId) return;
+    const result = await gqlRequest(
+      `mutation($name: String!, $targetAmount: numeric!, $deadline: String, $userId: uuid!) {
+        insert_goals(objects: [{name: $name, target_amount: $targetAmount, deadline: $deadline, user_id: $userId}]) { affected_rows }
+      }`,
+      { name: formData.name, targetAmount: Number(formData.target_amount), deadline: formData.deadline || null, userId }
+    );
+    if (!result.error) {
       setIsAddOpen(false);
       fetchGoals();
       setFormData({ name: "", target_amount: "", deadline: "" });
@@ -57,20 +64,21 @@ export default function GoalsContent() {
   }
 
   async function deleteGoal(id: string) {
-    const supabase = createClient();
-    await supabase.from("goals").delete().eq("id", id);
+    await gqlRequest(
+      `mutation($id: uuid!) { delete_goals(where: {id: {_eq: $id}}) { affected_rows } }`,
+      { id }
+    );
     fetchGoals();
   }
 
   async function addFunds() {
     if (!selectedGoal) return;
-    const supabase = createClient();
     const newAmount = Number(selectedGoal.saved_amount) + Number(contributeAmount);
-    const { error } = await supabase
-      .from("goals")
-      .update({ saved_amount: newAmount })
-      .eq("id", selectedGoal.id);
-    if (!error) {
+    const result = await gqlRequest(
+      `mutation($id: uuid!, $savedAmount: numeric!) { update_goals(where: {id: {_eq: $id}}, _set: {saved_amount: $savedAmount}) { affected_rows } }`,
+      { id: selectedGoal.id, savedAmount: newAmount }
+    );
+    if (!result.error) {
       setIsContributeOpen(false);
       setSelectedGoal(null);
       setContributeAmount("");

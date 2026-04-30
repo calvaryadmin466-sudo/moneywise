@@ -18,8 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { createClient } from "@/lib/supabase-browser";
-import { Transaction, CATEGORIES, formatCurrency, Currency } from "@/lib/supabase";
+import { nhost, gqlRequest, formatCurrency, Currency, Transaction, CATEGORIES } from "@/lib/nhost";
 import { useSearchParams } from "next/navigation";
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title);
@@ -40,9 +39,14 @@ export default function ReportsContent() {
 
   async function fetchTransactions() {
     setLoading(true);
-    const supabase = createClient();
-    const { data } = await supabase.from("transactions").select("*").order("date", { ascending: false });
-    if (data) setTransactions(data);
+    const user = await nhost.auth.getUser();
+    const userId = user?.id;
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+    const result = await gqlRequest(`query { transactions(where: {user_id: {_eq: "${userId}"}}, order_by: {date: desc}) { id user_id type amount category date note is_recurring created_at } }`);
+    if (result.data?.transactions) setTransactions(result.data.transactions);
     setLoading(false);
   }
 

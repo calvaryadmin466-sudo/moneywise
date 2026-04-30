@@ -11,8 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { createClient } from "@/lib/supabase-browser";
-import { Transaction, CATEGORIES, formatCurrency, Currency } from "@/lib/supabase";
+import { nhost, gqlRequest, formatCurrency, Currency, Transaction, CATEGORIES } from "@/lib/nhost";
 import { useSearchParams } from "next/navigation";
 
 export default function TransactionsContent() {
@@ -42,22 +41,28 @@ export default function TransactionsContent() {
 
   async function fetchTransactions() {
     setLoading(true);
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("transactions")
-      .select("*")
-      .order("date", { ascending: false });
-    if (data) setTransactions(data);
+    const user = await nhost.auth.getUser();
+    const userId = user?.id;
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+    const result = await gqlRequest(`query { transactions(where: {user_id: {_eq: "${userId}"}}, order_by: {date: desc}) { id user_id type amount category date note is_recurring created_at } }`);
+    if (result.data?.transactions) setTransactions(result.data.transactions);
     setLoading(false);
   }
 
   async function addTransaction() {
-    const supabase = createClient();
-    const { error } = await supabase.from("transactions").insert([{
-      ...formData,
-      amount: Number(formData.amount),
-    }]);
-    if (!error) {
+    const user = await nhost.auth.getUser();
+    const userId = user?.id;
+    if (!userId) return;
+    const result = await gqlRequest(
+      `mutation($type: String!, $amount: numeric!, $category: String!, $date: date!, $note: String, $isRecurring: Boolean!, $userId: uuid!) {
+        insert_transactions(objects: [{type: $type, amount: $amount, category: $category, date: $date, note: $note, is_recurring: $isRecurring, user_id: $userId}]) { affected_rows }
+      }`,
+      { type: formData.type, amount: Number(formData.amount), category: formData.category, date: formData.date, note: formData.note || null, isRecurring: formData.is_recurring, userId }
+    );
+    if (!result.error) {
       fetchTransactions();
       setFormData({
         type: "expense",
@@ -72,15 +77,13 @@ export default function TransactionsContent() {
 
   async function updateTransaction() {
     if (!editingTransaction) return;
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("transactions")
-      .update({
-        ...formData,
-        amount: Number(formData.amount),
-      })
-      .eq("id", editingTransaction.id);
-    if (!error) {
+    const result = await gqlRequest(
+      `mutation($id: uuid!, $type: String!, $amount: numeric!, $category: String!, $date: date!, $note: String, $isRecurring: Boolean!) {
+        update_transactions(where: {id: {_eq: $id}}, _set: {type: $type, amount: $amount, category: $category, date: $date, note: $note, is_recurring: $isRecurring}) { affected_rows }
+      }`,
+      { id: editingTransaction.id, type: formData.type, amount: Number(formData.amount), category: formData.category, date: formData.date, note: formData.note || null, isRecurring: formData.is_recurring }
+    );
+    if (!result.error) {
       setIsEditOpen(false);
       setEditingTransaction(null);
       fetchTransactions();
@@ -88,9 +91,11 @@ export default function TransactionsContent() {
   }
 
   async function deleteTransaction(id: string) {
-    const supabase = createClient();
-    const { error } = await supabase.from("transactions").delete().eq("id", id);
-    if (!error) fetchTransactions();
+    const result = await gqlRequest(
+      `mutation($id: uuid!) { delete_transactions(where: {id: {_eq: $id}}) { affected_rows } }`,
+      { id }
+    );
+    if (!result.error) fetchTransactions();
   }
 
   function openEdit(transaction: Transaction) {
