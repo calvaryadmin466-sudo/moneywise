@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles, X, Send, Loader2, TrendingUp, PiggyBank, Globe, Target, Brain, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { Sparkles, X, Send, Loader2, TrendingUp, PiggyBank, Globe, Target, Brain, ArrowUpRight, ArrowDownRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { getUser, gqlRequest, formatCurrency, Transaction, Budget, Goal } from "@/lib/nhost";
+import { StockData, getStocksForCountry, getMarketStatus } from "@/lib/stocks";
 
 interface Message {
   role: "user" | "assistant";
@@ -118,6 +119,9 @@ export function AIFinancialAdvisorV2() {
   const [dataLoaded, setDataLoaded] = React.useState(false);
   const [behaviorAnalysis, setBehaviorAnalysis] = React.useState<any>(null);
   const [forecasts, setForecasts] = React.useState<any>(null);
+  const [stocks, setStocks] = React.useState<StockData[]>([]);
+  const [stocksLoading, setStocksLoading] = React.useState(false);
+  const [marketStatus, setMarketStatus] = React.useState(getMarketStatus());
 
   React.useEffect(() => {
     if (isOpen && !dataLoaded) {
@@ -148,7 +152,22 @@ export function AIFinancialAdvisorV2() {
     analyzeBehavior(transRes.data?.transactions || []);
     generateForecasts(transRes.data?.transactions || [], goalsRes.data?.goals || []);
     
+    // Fetch stocks for user's country
+    await fetchStocks(profileRes.data?.user_profiles_by_pk?.country || "US");
+    
     setDataLoaded(true);
+  }
+
+  async function fetchStocks(country: string) {
+    setStocksLoading(true);
+    try {
+      const stockData = await getStocksForCountry(country);
+      setStocks(stockData);
+    } catch (error) {
+      console.error("Error fetching stocks:", error);
+    } finally {
+      setStocksLoading(false);
+    }
   }
 
   function analyzeBehavior(trans: Transaction[]) {
@@ -450,42 +469,69 @@ Provide practical, actionable financial advice including specific investment rec
   }
 
   function renderInvestments() {
-    const { stocks, land } = getInvestmentContext();
+    const { land } = getInvestmentContext();
 
     return (
       <div className="space-y-4 p-4 max-h-[400px] overflow-y-auto">
         <div>
-          <h4 className="text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-green-400" /> Stock Recommendations
-          </h4>
-          <div className="space-y-2">
-            {stocks.map((stock, i) => (
-              <div key={i} className="flex items-center justify-between p-3 bg-[#1e293b]/50 rounded-lg">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-white">{stock.symbol}</span>
-                    <Badge 
-                      className={
-                        stock.recommendation === "BUY" ? "bg-green-500/20 text-green-400" :
-                        stock.recommendation === "HOLD" ? "bg-amber-500/20 text-amber-400" :
-                        "bg-red-500/20 text-red-400"
-                      }
-                    >
-                      {stock.recommendation}
-                    </Badge>
-                  </div>
-                  <div className="text-xs text-gray-400">{stock.name} • {stock.sector}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-medium text-white">{stock.price}</div>
-                  <div className={`text-xs flex items-center gap-1 ${stock.change.startsWith("+") ? "text-green-400" : "text-red-400"}`}>
-                    {stock.change.startsWith("+") ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                    {stock.change}
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-medium text-gray-300 flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-green-400" /> Stock Recommendations
+            </h4>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className={marketStatus.isOpen ? "text-green-400 border-green-400/30" : "text-gray-400 border-gray-400/30"}>
+                {marketStatus.isOpen ? "Market Open" : "Market Closed"}
+              </Badge>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => fetchStocks(userProfile.country || "US")}
+                disabled={stocksLoading}
+                className="h-7 px-2 text-cyan-400 hover:text-cyan-300"
+              >
+                {stocksLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+              </Button>
+            </div>
           </div>
+          
+          {stocksLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-cyan-400" />
+            </div>
+          ) : stocks.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-4">No stock data available</p>
+          ) : (
+            <div className="space-y-2">
+              {stocks.map((stock, i) => (
+                <div key={i} className="flex items-center justify-between p-3 bg-[#1e293b]/50 rounded-lg">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-white">{stock.symbol}</span>
+                      <Badge 
+                        className={
+                          stock.changePercent > 0 ? "bg-green-500/20 text-green-400" :
+                          stock.changePercent < 0 ? "bg-red-500/20 text-red-400" :
+                          "bg-amber-500/20 text-amber-400"
+                        }
+                      >
+                        {stock.changePercent > 0 ? "BUY" : stock.changePercent < -2 ? "HOLD" : "NEUTRAL"}
+                      </Badge>
+                    </div>
+                    <div className="text-xs text-gray-400">{stock.name} • {stock.sector}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-medium text-white">
+                      {stock.currency} {stock.price.toLocaleString()}
+                    </div>
+                    <div className={`text-xs flex items-center gap-1 ${stock.change >= 0 ? "text-green-400" : "text-red-400"}`}>
+                      {stock.change >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                      {stock.changePercent.toFixed(2)}%
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div>
@@ -516,7 +562,7 @@ Provide practical, actionable financial advice including specific investment rec
           </h4>
           <p className="text-xs text-gray-400">
             Based on your savings rate of {forecasts?.savingsRate?.toFixed(1)}%, consider investing 
-            {forecasts?.monthlySavings && forecasts.monthlySavings > 0 ? ` ${formatCurrency(forecasts.monthlySavings * 0.3)} monthly` : ""} in a mix of DSE blue-chip stocks and land banking for optimal returns.
+            {forecasts?.monthlySavings && forecasts.monthlySavings > 0 ? ` ${formatCurrency(forecasts.monthlySavings * 0.3)} monthly` : ""} in a mix of {userProfile.country === "TZ" ? "DSE" : userProfile.country === "KE" ? "NSE" : userProfile.country === "NG" ? "NGX" : ""} blue-chip stocks and land banking for optimal returns.
           </p>
         </div>
       </div>
