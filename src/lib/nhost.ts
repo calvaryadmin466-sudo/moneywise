@@ -1,25 +1,35 @@
 // Simple in-memory storage for session
 let currentSession: { accessToken: string; user: { id: string; email: string } } | null = null
 
+// Get base auth URL (remove /v1 if present)
+const getAuthBaseUrl = () => {
+  const url = process.env.NHOST_AUTH_URL || ''
+  return url.replace(/\/v1\/?$/, '')
+}
+
 // Auth functions using direct fetch to Nhost Auth API
 export async function signIn(email: string, password: string) {
   try {
-    const response = await fetch(`${process.env.NHOST_AUTH_URL}/signin/email-password`, {
+    const baseUrl = getAuthBaseUrl()
+    const response = await fetch(`${baseUrl}/signin/email-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     })
     
     const text = await response.text()
+    console.log('SignIn response:', text.substring(0, 200))
+    
     let data
     try {
       data = JSON.parse(text)
     } catch {
-      return { data: null, error: new Error('Invalid response from server') }
+      console.error('Failed to parse JSON:', text.substring(0, 500))
+      return { data: null, error: new Error('Server error - please try again') }
     }
     
     if (!response.ok) {
-      return { data: null, error: new Error(data?.message || 'Sign in failed') }
+      return { data: null, error: new Error(data?.message || data?.error || 'Sign in failed') }
     }
     
     if (data?.session) {
@@ -31,32 +41,38 @@ export async function signIn(email: string, password: string) {
     
     return { data, error: null }
   } catch (err: unknown) {
+    console.error('SignIn error:', err)
     return { data: null, error: err instanceof Error ? err : new Error('Sign in failed') }
   }
 }
 
 export async function signUp(email: string, password: string) {
   try {
-    const response = await fetch(`${process.env.NHOST_AUTH_URL}/signup/email-password`, {
+    const baseUrl = getAuthBaseUrl()
+    const response = await fetch(`${baseUrl}/signup/email-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     })
     
     const text = await response.text()
+    console.log('SignUp response:', text.substring(0, 200))
+    
     let data
     try {
       data = JSON.parse(text)
     } catch {
-      return { data: null, error: new Error('Invalid response from server') }
+      console.error('Failed to parse JSON:', text.substring(0, 500))
+      return { data: null, error: new Error('Server error - please try again') }
     }
     
     if (!response.ok) {
-      return { data: null, error: new Error(data?.message || 'Sign up failed') }
+      return { data: null, error: new Error(data?.message || data?.error || 'Sign up failed') }
     }
     
     return { data, error: null }
   } catch (err: unknown) {
+    console.error('SignUp error:', err)
     return { data: null, error: err instanceof Error ? err : new Error('Sign up failed') }
   }
 }
@@ -67,11 +83,42 @@ export async function signOut() {
 }
 
 export async function getAccessToken(): Promise<string | null> {
+  // Try to refresh session if needed
+  if (!currentSession) {
+    await refreshSession()
+  }
   return currentSession?.accessToken || null
 }
 
 export async function getUser() {
+  // Try to refresh session if needed
+  if (!currentSession) {
+    await refreshSession()
+  }
   return currentSession?.user || null
+}
+
+async function refreshSession() {
+  try {
+    const baseUrl = getAuthBaseUrl()
+    const response = await fetch(`${baseUrl}/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include'
+    })
+    
+    if (response.ok) {
+      const data = await response.json()
+      if (data?.session) {
+        currentSession = {
+          accessToken: data.session.accessToken,
+          user: data.session.user
+        }
+      }
+    }
+  } catch {
+    // Silent fail - user is not logged in
+  }
 }
 
 export async function gqlRequest<T = unknown>(query: string, variables?: Record<string, unknown>): Promise<{ data?: T; error?: string }> {
