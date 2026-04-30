@@ -34,7 +34,8 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
 import { AddTransactionSheet } from "@/components/dashboard/add-transaction-sheet";
 import { SpendingInsightsDialog } from "@/components/dashboard/spending-insights-dialog";
-import { AIFinancialAdvisor } from "@/components/dashboard/ai-financial-advisor";
+import { AIFinancialAdvisorV2 } from "@/components/dashboard/ai-financial-advisor-v2";
+import { MobileNav } from "@/components/mobile-nav";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getUser, gqlRequest, signOut } from "@/lib/nhost";
 import { Transaction } from "@/lib/nhost";
@@ -144,6 +145,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <span className="font-medium">Settings</span>
               </div>
             </Link>
+            <Link href="/profile" className="block">
+              <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/profile') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
+                <User className="h-5 w-5" />
+                <span className="font-medium">Profile</span>
+              </div>
+            </Link>
           </nav>
         </SidebarContent>
         <SidebarFooter className="border-t border-white/10 p-4">
@@ -183,7 +190,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <h1 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">{capitalizedTitle}</h1>
           </div>
           <div className="flex items-center gap-3">
-            <AIFinancialAdvisor />
+            <AIFinancialAdvisorV2 />
             <Button 
               variant="outline" 
               onClick={() => setInsightsOpen(true)}
@@ -196,6 +203,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </header>
         {children}
       </SidebarInset>
+      <MobileNav />
     </SidebarProvider>
   );
 }

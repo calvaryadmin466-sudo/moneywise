@@ -81,6 +81,8 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   display_name TEXT,
   avatar_url TEXT,
   currency_preference TEXT DEFAULT 'TZS',
+  country TEXT DEFAULT 'TZ',
+  phone TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
   last_seen_at TIMESTAMPTZ DEFAULT now()
 );

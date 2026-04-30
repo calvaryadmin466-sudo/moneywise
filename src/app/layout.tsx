@@ -1,10 +1,37 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
+import { PWAProvider } from '@/components/pwa-provider';
 
 export const metadata: Metadata = {
-  title: 'MoneyWise',
-  description: 'Track your financial usage with MoneyWise',
+  title: 'MoneyWise - Personal Finance',
+  description: 'Manage your finances, budgets, goals, and investments with AI-powered insights',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'MoneyWise',
+  },
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/icons/icon-192x192.svg', sizes: '192x192', type: 'image/svg+xml' },
+      { url: '/icons/icon-512x512.svg', sizes: '512x512', type: 'image/svg+xml' },
+    ],
+    apple: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+    ],
+    shortcut: [{ url: '/icon.svg' }],
+  },
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  themeColor: '#01ccb8',
+  colorScheme: 'dark',
 };
 
 export default function RootLayout({
@@ -21,9 +48,20 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="MoneyWise" />
+        <meta name="application-name" content="MoneyWise" />
+        <meta name="msapplication-TileColor" content="#01ccb8" />
+        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+        <meta name="msapplication-tap-highlight" content="no" />
+        <meta name="format-detection" content="telephone=no" />
       </head>
-      <body className="font-body antialiased">
-        {children}
+      <body className="font-body antialiased touch-manipulation">
+        <PWAProvider>
+          {children}
+        </PWAProvider>
         <Toaster />
       </body>
     </html>

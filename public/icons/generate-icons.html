@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate MoneyWise Icons</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        canvas { border: 1px solid #ccc; margin: 10px; }
+        .icon-row { display: flex; flex-wrap: wrap; }
+    </style>
+</head>
+<body>
+    <h1>MoneyWise Icon Generator</h1>
+    <p>Right-click and save each icon. Then convert to PNG.</p>
+    <div id="icons"></div>
+    <script>
+        const sizes = [72, 96, 128, 144, 152, 192, 384, 512];
+        const container = document.getElementById('icons');
+        
+        sizes.forEach(size => {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // Background gradient
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#06b6d4');
+            gradient.addColorStop(1, '#3b82f6');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, size, size);
+            
+            // Border radius
+            ctx.globalCompositeOperation = 'destination-in';
+            ctx.beginPath();
+            ctx.roundRect(0, 0, size, size, size * 0.15);
+            ctx.fill();
+            ctx.globalCompositeOperation = 'source-over';
+            
+            // Letter M
+            ctx.fillStyle = 'white';
+            ctx.font = `bold ${size * 0.6}px Inter, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('M', size/2, size/2);
+            
+            // $ symbol small
+            ctx.font = `bold ${size * 0.25}px Inter, sans-serif`;
+            ctx.fillText('$', size * 0.75, size * 0.3);
+            
+            container.appendChild(canvas);
+            
+            const label = document.createElement('div');
+            label.textContent = `${size}x${size}`;
+            container.appendChild(label);
+        });
+    </script>
+</body>
+</html>
