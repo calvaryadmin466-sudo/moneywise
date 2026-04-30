@@ -1,12 +1,15 @@
 // Simple in-memory storage for session
 let currentSession: { accessToken: string; user: { id: string; email: string } } | null = null
 
-// Get base auth URL - try different formats
+// Get base auth URL - use public env vars for browser
 const getAuthUrl = () => {
-  const url = process.env.NHOST_AUTH_URL || ''
-  // First try the base subdomain URL
-  const baseUrl = `https://${process.env.NHOST_SUBDOMAIN}.auth.${process.env.NHOST_REGION}.nhost.run`
-  return baseUrl
+  const subdomain = process.env.NEXT_PUBLIC_NHOST_SUBDOMAIN
+  const region = process.env.NEXT_PUBLIC_NHOST_REGION
+  if (!subdomain || !region) {
+    console.error('Missing Nhost config:', { subdomain, region })
+    throw new Error('Nhost configuration missing')
+  }
+  return `https://${subdomain}.auth.${region}.nhost.run`
 }
 
 // Auth functions using direct fetch to Nhost Auth API
@@ -139,7 +142,11 @@ async function refreshSession() {
 export async function gqlRequest<T = unknown>(query: string, variables?: Record<string, unknown>): Promise<{ data?: T; error?: string }> {
   try {
     const token = await getAccessToken()
-    const response = await fetch(process.env.NHOST_GRAPHQL_URL!, {
+    const graphqlUrl = process.env.NEXT_PUBLIC_NHOST_GRAPHQL_URL
+    if (!graphqlUrl) {
+      throw new Error('GraphQL URL not configured')
+    }
+    const response = await fetch(graphqlUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
