@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { nhost, gqlRequest, formatCurrency, Currency, Transaction, CATEGORIES } from "@/lib/nhost";
+import { getUser, gqlRequest, formatCurrency, Currency, Transaction, CATEGORIES } from "@/lib/nhost";
 import { useSearchParams } from "next/navigation";
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title);
@@ -39,7 +39,7 @@ export default function ReportsContent() {
 
   async function fetchTransactions() {
     setLoading(true);
-    const user = await nhost.auth.getUser();
+    const user = await getUser();
     const userId = user?.id;
     if (!userId) {
       setLoading(false);

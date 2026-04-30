@@ -1,18 +1,35 @@
-import { createClient } from '@nhost/nhost-js'
-import { createAPIClient } from '@nhost/nhost-js/auth'
+// Simple in-memory storage for session
+let currentSession: { accessToken: string; user: { id: string; email: string } } | null = null
 
-export const nhost = createClient({
-  subdomain: process.env.NHOST_SUBDOMAIN || '',
-  region: process.env.NHOST_REGION || '',
-})
-
-const authClient = createAPIClient(process.env.NHOST_AUTH_URL || '')
-
-// Auth functions using Nhost auth
+// Auth functions using direct fetch to Nhost Auth API
 export async function signIn(email: string, password: string) {
   try {
-    const result = await authClient.signInEmailPassword({ email, password })
-    return { data: result.body, error: null }
+    const response = await fetch(`${process.env.NHOST_AUTH_URL}/signin/email-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    
+    const text = await response.text()
+    let data
+    try {
+      data = JSON.parse(text)
+    } catch {
+      return { data: null, error: new Error('Invalid response from server') }
+    }
+    
+    if (!response.ok) {
+      return { data: null, error: new Error(data?.message || 'Sign in failed') }
+    }
+    
+    if (data?.session) {
+      currentSession = {
+        accessToken: data.session.accessToken,
+        user: data.session.user
+      }
+    }
+    
+    return { data, error: null }
   } catch (err: unknown) {
     return { data: null, error: err instanceof Error ? err : new Error('Sign in failed') }
   }
@@ -20,38 +37,41 @@ export async function signIn(email: string, password: string) {
 
 export async function signUp(email: string, password: string) {
   try {
-    const result = await authClient.signUpEmailPassword({ email, password })
-    return { data: result.body, error: null }
+    const response = await fetch(`${process.env.NHOST_AUTH_URL}/signup/email-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    
+    const text = await response.text()
+    let data
+    try {
+      data = JSON.parse(text)
+    } catch {
+      return { data: null, error: new Error('Invalid response from server') }
+    }
+    
+    if (!response.ok) {
+      return { data: null, error: new Error(data?.message || 'Sign up failed') }
+    }
+    
+    return { data, error: null }
   } catch (err: unknown) {
     return { data: null, error: err instanceof Error ? err : new Error('Sign up failed') }
   }
 }
 
 export async function signOut() {
-  try {
-    await authClient.signOut()
-    return { error: null }
-  } catch (err: unknown) {
-    return { error: err instanceof Error ? err : new Error('Sign out failed') }
-  }
+  currentSession = null
+  return { error: null }
 }
 
 export async function getAccessToken(): Promise<string | null> {
-  try {
-    const session = await authClient.getSession()
-    return session?.body?.session?.accessToken || null
-  } catch {
-    return null
-  }
+  return currentSession?.accessToken || null
 }
 
 export async function getUser() {
-  try {
-    const session = await authClient.getSession()
-    return session?.body?.session?.user || null
-  } catch {
-    return null
-  }
+  return currentSession?.user || null
 }
 
 export async function gqlRequest<T = unknown>(query: string, variables?: Record<string, unknown>): Promise<{ data?: T; error?: string }> {
@@ -73,6 +93,36 @@ export async function gqlRequest<T = unknown>(query: string, variables?: Record<
   } catch (err: unknown) {
     return { error: err instanceof Error ? err.message : 'Unknown error' }
   }
+}
+
+// Track user activity
+export async function trackActivity(
+  action: string,
+  entityType?: string,
+  entityId?: string,
+  metadata?: Record<string, unknown>
+) {
+  const user = await getUser()
+  if (!user) return
+
+  await gqlRequest(
+    `mutation($userId: uuid!, $action: String!, $entityType: String, $entityId: uuid, $metadata: jsonb) {
+      insert_user_activity(objects: [{
+        user_id: $userId,
+        action: $action,
+        entity_type: $entityType,
+        entity_id: $entityId,
+        metadata: $metadata
+      }]) { affected_rows }
+    }`,
+    {
+      userId: user.id,
+      action,
+      entityType: entityType || null,
+      entityId: entityId || null,
+      metadata: metadata || null
+    }
+  )
 }
 
 export const formatCurrency = (amount: number, currency: string = 'TZS'): string => {

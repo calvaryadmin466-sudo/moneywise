@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
-import { nhost, gqlRequest, CATEGORIES } from "@/lib/nhost";
+import { getUser, gqlRequest, CATEGORIES } from "@/lib/nhost";
 import type { Transaction } from "@/lib/nhost";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -83,7 +83,7 @@ export function AddTransactionSheet({
   }, [isOpen, form]);
 
   async function onSubmit(data: TransactionFormValues) {
-    const user = await nhost.auth.getUser();
+    const user = await getUser();
     const userId = user?.id;
     if (!userId) return;
     

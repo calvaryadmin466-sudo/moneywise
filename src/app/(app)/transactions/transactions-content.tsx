@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { nhost, gqlRequest, formatCurrency, Currency, Transaction, CATEGORIES } from "@/lib/nhost";
+import { getUser, gqlRequest, formatCurrency, Currency, Transaction, CATEGORIES } from "@/lib/nhost";
 import { useSearchParams } from "next/navigation";
 
 export default function TransactionsContent() {
@@ -41,7 +41,7 @@ export default function TransactionsContent() {
 
   async function fetchTransactions() {
     setLoading(true);
-    const user = await nhost.auth.getUser();
+    const user = await getUser();
     const userId = user?.id;
     if (!userId) {
       setLoading(false);
@@ -53,7 +53,7 @@ export default function TransactionsContent() {
   }
 
   async function addTransaction() {
-    const user = await nhost.auth.getUser();
+    const user = await getUser();
     const userId = user?.id;
     if (!userId) return;
     const result = await gqlRequest(

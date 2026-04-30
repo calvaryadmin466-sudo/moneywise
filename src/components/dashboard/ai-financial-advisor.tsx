@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { nhost, gqlRequest, formatCurrency, Transaction, Budget, Goal } from "@/lib/nhost";
+import { getUser, gqlRequest, formatCurrency, Transaction, Budget, Goal } from "@/lib/nhost";
 
 interface Message {
   role: "user" | "assistant";
@@ -32,7 +32,7 @@ export function AIFinancialAdvisor() {
   }, [isOpen]);
 
   async function fetchUserData() {
-    const user = await nhost.auth.getUser();
+    const user = await getUser();
     const userId = user?.id;
     if (!userId) return;
 

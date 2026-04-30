@@ -36,7 +36,7 @@ import { AddTransactionSheet } from "@/components/dashboard/add-transaction-shee
 import { SpendingInsightsDialog } from "@/components/dashboard/spending-insights-dialog";
 import { AIFinancialAdvisor } from "@/components/dashboard/ai-financial-advisor";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { nhost, gqlRequest, signOut } from "@/lib/nhost";
+import { getUser, gqlRequest, signOut } from "@/lib/nhost";
 import { Transaction } from "@/lib/nhost";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -50,7 +50,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // Check auth on mount
   React.useEffect(() => {
     async function checkAuth() {
-      const user = await nhost.auth.getUser();
+      const user = await getUser();
       
       if (!user) {
         router.push('/login');
@@ -64,7 +64,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // Fetch transactions for insights dialog
   React.useEffect(() => {
     async function fetchTransactions() {
-      const user = await nhost.auth.getUser();
+      const user = await getUser();
       const userId = user?.id;
       if (!userId) return;
       

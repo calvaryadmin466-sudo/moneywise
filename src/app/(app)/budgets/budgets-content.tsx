@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { nhost, gqlRequest, formatCurrency, Currency, Transaction, Budget, CATEGORIES } from "@/lib/nhost";
+import { getUser, gqlRequest, formatCurrency, Currency, Transaction, Budget, CATEGORIES } from "@/lib/nhost";
 import { useSearchParams } from "next/navigation";
 
 export default function BudgetsContent() {
@@ -35,7 +35,7 @@ export default function BudgetsContent() {
 
   async function fetchData() {
     setLoading(true);
-    const user = await nhost.auth.getUser();
+    const user = await getUser();
     const userId = user?.id;
     if (!userId) {
       setLoading(false);
@@ -51,7 +51,7 @@ export default function BudgetsContent() {
   }
 
   async function addBudget() {
-    const user = await nhost.auth.getUser();
+    const user = await getUser();
     const userId = user?.id;
     if (!userId) return;
     const result = await gqlRequest(

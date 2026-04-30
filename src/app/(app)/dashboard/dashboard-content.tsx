@@ -28,7 +28,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { nhost, gqlRequest, formatCurrency, Currency, Transaction, Budget, Goal, CATEGORIES } from "@/lib/nhost";
+import { getUser, gqlRequest, formatCurrency, Currency, Transaction, Budget, Goal, CATEGORIES } from "@/lib/nhost";
 import { useSearchParams } from "next/navigation";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
@@ -53,7 +53,7 @@ export default function DashboardContent() {
 
   async function fetchData() {
     setLoading(true);
-    const user = await nhost.auth.getUser();
+    const user = await getUser();
     const userId = user?.id;
     if (!userId) {
       setLoading(false);
@@ -73,7 +73,7 @@ export default function DashboardContent() {
 
   async function addCheckInTransaction() {
     if (!checkInAmount) return;
-    const user = await nhost.auth.getUser();
+    const user = await getUser();
     const userId = user?.id;
     if (!userId) return;
     const result = await gqlRequest(

@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { nhost, gqlRequest, formatCurrency, Currency, Debt } from "@/lib/nhost";
+import { getUser, gqlRequest, formatCurrency, Currency, Debt } from "@/lib/nhost";
 import { useSearchParams } from "next/navigation";
 
 export default function DebtsContent() {
@@ -34,7 +34,7 @@ export default function DebtsContent() {
 
   async function fetchDebts() {
     setLoading(true);
-    const user = await nhost.auth.getUser();
+    const user = await getUser();
     const userId = user?.id;
     if (!userId) {
       setLoading(false);
@@ -46,7 +46,7 @@ export default function DebtsContent() {
   }
 
   async function addDebt() {
-    const user = await nhost.auth.getUser();
+    const user = await getUser();
     const userId = user?.id;
     if (!userId) return;
     const result = await gqlRequest(

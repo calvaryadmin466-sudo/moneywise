@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { nhost, gqlRequest, formatCurrency, Currency, Goal } from "@/lib/nhost";
+import { getUser, gqlRequest, formatCurrency, Currency, Goal } from "@/lib/nhost";
 import { useSearchParams } from "next/navigation";
 
 export default function GoalsContent() {
@@ -35,7 +35,7 @@ export default function GoalsContent() {
 
   async function fetchGoals() {
     setLoading(true);
-    const user = await nhost.auth.getUser();
+    const user = await getUser();
     const userId = user?.id;
     if (!userId) {
       setLoading(false);
@@ -47,7 +47,7 @@ export default function GoalsContent() {
   }
 
   async function addGoal() {
-    const user = await nhost.auth.getUser();
+    const user = await getUser();
     const userId = user?.id;
     if (!userId) return;
     const result = await gqlRequest(
