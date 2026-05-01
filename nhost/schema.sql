@@ -158,3 +158,85 @@ CREATE TRIGGER update_last_seen_trigger
   AFTER INSERT ON user_activity
   FOR EACH ROW
   EXECUTE FUNCTION update_user_last_seen();
+
+-- Grant permissions for user_assets mutations
+GRANT ALL ON user_assets TO public;
+
+-- Enable mutations for user_assets in Hasura
+COMMENT ON TABLE user_assets IS 'user_assets';
+
+-- Create function for inserting assets (bypasses Hasura mutation issues)
+CREATE OR REPLACE FUNCTION insert_user_asset(
+  p_user_id UUID,
+  p_type TEXT,
+  p_name TEXT,
+  p_balance NUMERIC,
+  p_currency TEXT,
+  p_account_number TEXT DEFAULT NULL,
+  p_bank_name TEXT DEFAULT NULL,
+  p_broker_name TEXT DEFAULT NULL,
+  p_description TEXT DEFAULT NULL
+) RETURNS UUID AS $$
+DECLARE
+  v_id UUID;
+BEGIN
+  INSERT INTO user_assets (
+    user_id, type, name, balance, currency,
+    account_number, bank_name, broker_name, description
+  ) VALUES (
+    p_user_id, p_type, p_name, p_balance, p_currency,
+    p_account_number, p_bank_name, p_broker_name, p_description
+  )
+  RETURNING id INTO v_id;
+  
+  RETURN v_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Grant execute permission
+GRANT EXECUTE ON FUNCTION insert_user_asset TO public;
+
+-- Create function for updating assets
+CREATE OR REPLACE FUNCTION update_user_asset(
+  p_id UUID,
+  p_user_id UUID,
+  p_type TEXT DEFAULT NULL,
+  p_name TEXT DEFAULT NULL,
+  p_balance NUMERIC DEFAULT NULL,
+  p_currency TEXT DEFAULT NULL,
+  p_account_number TEXT DEFAULT NULL,
+  p_bank_name TEXT DEFAULT NULL,
+  p_broker_name TEXT DEFAULT NULL,
+  p_description TEXT DEFAULT NULL
+) RETURNS BOOLEAN AS $$
+BEGIN
+  UPDATE user_assets SET
+    type = COALESCE(p_type, type),
+    name = COALESCE(p_name, name),
+    balance = COALESCE(p_balance, balance),
+    currency = COALESCE(p_currency, currency),
+    account_number = COALESCE(p_account_number, account_number),
+    bank_name = COALESCE(p_bank_name, bank_name),
+    broker_name = COALESCE(p_broker_name, broker_name),
+    description = COALESCE(p_description, description),
+    updated_at = NOW()
+  WHERE id = p_id AND user_id = p_user_id;
+  
+  RETURN FOUND;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create function for deleting assets
+CREATE OR REPLACE FUNCTION delete_user_asset(
+  p_id UUID,
+  p_user_id UUID
+) RETURNS BOOLEAN AS $$
+BEGIN
+  DELETE FROM user_assets WHERE id = p_id AND user_id = p_user_id;
+  RETURN FOUND;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Grant execute permissions
+GRANT EXECUTE ON FUNCTION update_user_asset TO public;
+GRANT EXECUTE ON FUNCTION delete_user_asset TO public;

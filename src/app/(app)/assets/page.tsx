@@ -107,21 +107,20 @@ export default function AssetsPage() {
       return;
     }
 
+    // Use stored procedure to bypass Hasura mutation tracking issue
     const result = await gqlRequest(
       `mutation($user_id: uuid!, $type: String!, $name: String!, $balance: numeric!, $currency: String!, $account_number: String, $bank_name: String, $broker_name: String, $description: String) {
-        insert_user_assets_one(object: {
-          user_id: $user_id,
-          type: $type,
-          name: $name,
-          balance: $balance,
-          currency: $currency,
-          account_number: $account_number,
-          bank_name: $bank_name,
-          broker_name: $broker_name,
-          description: $description
-        }) {
-          id
-        }
+        insert_user_asset(
+          p_user_id: $user_id,
+          p_type: $type,
+          p_name: $name,
+          p_balance: $balance,
+          p_currency: $currency,
+          p_account_number: $account_number,
+          p_bank_name: $bank_name,
+          p_broker_name: $broker_name,
+          p_description: $description
+        )
       }`,
       {
         user_id: user.id,
@@ -191,13 +190,16 @@ export default function AssetsPage() {
       return;
     }
 
+    // Use stored procedure for update
     const result = await gqlRequest(
-      `mutation($id: uuid!, $balance: numeric!) {
-        update_user_assets(where: {id: {_eq: $id}}, _set: {balance: $balance}) {
-          affected_rows
-        }
+      `mutation($id: uuid!, $user_id: uuid!, $balance: numeric!) {
+        update_user_asset(
+          p_id: $id,
+          p_user_id: $user_id,
+          p_balance: $balance
+        )
       }`,
-      { id: updateAsset.id, balance: newBalance }
+      { id: updateAsset.id, user_id: user.id, balance: newBalance }
     );
 
     if (result.error) {
@@ -218,13 +220,18 @@ export default function AssetsPage() {
   }
 
   async function handleDeleteAsset(assetId: string) {
+    const user = await getUser();
+    if (!user) return;
+    
+    // Use stored procedure for delete
     const result = await gqlRequest(
-      `mutation($id: uuid!) {
-        update_user_assets(where: {id: {_eq: $id}}, _set: {is_active: false}) {
-          affected_rows
-        }
+      `mutation($id: uuid!, $user_id: uuid!) {
+        delete_user_asset(
+          p_id: $id,
+          p_user_id: $user_id
+        )
       }`,
-      { id: assetId }
+      { id: assetId, user_id: user.id }
     );
 
     if (!result.error) {
