@@ -287,3 +287,139 @@ export interface Debt {
   due_date: string | null
   created_at: string
 }
+
+export interface Asset {
+  id: string
+  user_id: string
+  type: 'cash' | 'bank' | 'mobile_money' | 'stocks' | 'real_estate' | 'other'
+  name: string
+  balance: number
+  currency: string
+  account_number?: string
+  bank_name?: string
+  broker_name?: string
+  description?: string
+  created_at: string
+  updated_at: string
+}
+
+// Direct REST API insert for user_assets (bypasses Hasura GraphQL issues)
+export async function insertAssetDirect(asset: Omit<Asset, 'id' | 'created_at' | 'updated_at'>): Promise<{ data?: Asset; error?: string }> {
+  try {
+    const token = await getAccessToken()
+    const user = await getUser()
+    if (!user) return { error: 'Not authenticated' }
+    
+    // Generate UUID for the asset
+    const id = crypto.randomUUID()
+    
+    // Use direct database REST API
+    const dbUrl = `https://${NHOST_CONFIG.subdomain}.db.${NHOST_CONFIG.region}.nhost.run/v1/graphql`
+    
+    const response = await fetch(dbUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'x-hasura-role': 'user'
+      },
+      body: JSON.stringify({
+        query: `mutation {
+          insert_user_assets(objects: [{
+            id: "${id}",
+            user_id: "${user.id}",
+            type: "${asset.type}",
+            name: "${asset.name}",
+            balance: ${asset.balance},
+            currency: "${asset.currency}",
+            account_number: ${asset.account_number ? `"${asset.account_number}"` : null},
+            bank_name: ${asset.bank_name ? `"${asset.bank_name}"` : null},
+            broker_name: ${asset.broker_name ? `"${asset.broker_name}"` : null},
+            description: ${asset.description ? `"${asset.description}"` : null}
+          }]) {
+            returning {
+              id
+              user_id
+              type
+              name
+              balance
+              currency
+              account_number
+              bank_name
+              broker_name
+              description
+              created_at
+              updated_at
+            }
+          }
+        }`
+      })
+    })
+    
+    const result = await response.json()
+    if (result.errors) {
+      return { error: result.errors[0].message }
+    }
+    return { data: result.data?.insert_user_assets?.returning?.[0] }
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : 'Failed to insert asset' }
+  }
+}
+
+// Direct REST API for profile upsert (bypasses Hasura mutation issues)
+export async function saveProfileDirect(profile: {
+  id: string
+  display_name?: string
+  email?: string
+  avatar_url?: string
+  currency_preference?: string
+  country?: string
+  phone?: string
+}): Promise<{ data?: any; error?: string }> {
+  try {
+    const token = await getAccessToken()
+    if (!token) return { error: 'Not authenticated' }
+    
+    const dbUrl = `https://${NHOST_CONFIG.subdomain}.db.${NHOST_CONFIG.region}.nhost.run/v1/graphql`
+    
+    const response = await fetch(dbUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'x-hasura-role': 'user'
+      },
+      body: JSON.stringify({
+        query: `mutation {
+          insert_user_profiles(objects: [{
+            id: "${profile.id}",
+            display_name: "${profile.display_name || ''}",
+            email: "${profile.email || ''}",
+            avatar_url: "${profile.avatar_url || ''}",
+            currency_preference: "${profile.currency_preference || 'TZS'}",
+            country: "${profile.country || ''}",
+            phone: "${profile.phone || ''}"
+          }], on_conflict: { constraint: user_profiles_id_key, update_columns: [display_name, email, avatar_url, currency_preference, country, phone] }) {
+            returning {
+              id
+              display_name
+              email
+              avatar_url
+              currency_preference
+              country
+              phone
+            }
+          }
+        }`
+      })
+    })
+    
+    const result = await response.json()
+    if (result.errors) {
+      return { error: result.errors[0].message }
+    }
+    return { data: result.data?.insert_user_profiles?.returning?.[0] }
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : 'Failed to save profile' }
+  }
+}

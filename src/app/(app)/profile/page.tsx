@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { getUser, gqlRequest, signOut, getAccessToken } from "@/lib/nhost";
+import { gqlRequest, getUser, saveProfileDirect } from "@/lib/nhost";
 import { Camera, LogOut, User, Mail, Globe, DollarSign, Loader2, Upload } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -89,32 +89,16 @@ export default function ProfilePage() {
     const user = await getUser();
     if (!user) return;
 
-    const result = await gqlRequest(
-      `
-      mutation($id: uuid!, $display_name: String, $email: String, $avatar_url: String, $currency_preference: String, $country: String, $phone: String) {
-        insert_user_profiles_one(object: {
-          id: $id,
-          display_name: $display_name,
-          email: $email,
-          avatar_url: $avatar_url,
-          currency_preference: $currency_preference,
-          country: $country,
-          phone: $phone
-        }, on_conflict: { constraint: user_profiles_id_key, update_columns: [display_name, email, avatar_url, currency_preference, country, phone] }) {
-          id
-        }
-      }
-    `,
-      {
-        id: user.id,
-        display_name: profile.display_name,
-        email: profile.email,
-        avatar_url: profile.avatar_url,
-        currency_preference: profile.currency_preference,
-        country: profile.country,
-        phone: profile.phone,
-      }
-    );
+    // Use direct REST API to bypass Hasura mutation tracking issue
+    const result = await saveProfileDirect({
+      id: user.id,
+      display_name: profile.display_name,
+      email: profile.email,
+      avatar_url: profile.avatar_url,
+      currency_preference: profile.currency_preference,
+      country: profile.country,
+      phone: profile.phone,
+    });
 
     if (result.error) {
       toast({

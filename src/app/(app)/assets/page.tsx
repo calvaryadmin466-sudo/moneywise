@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { getUser, gqlRequest } from "@/lib/nhost";
+import { getUser, gqlRequest, insertAssetDirect } from "@/lib/nhost";
 import { 
   Wallet, 
   Building2, 
@@ -107,33 +107,18 @@ export default function AssetsPage() {
       return;
     }
 
-    // Use stored procedure to bypass Hasura mutation tracking issue
-    const result = await gqlRequest(
-      `mutation($user_id: uuid!, $type: String!, $name: String!, $balance: numeric!, $currency: String!, $account_number: String, $bank_name: String, $broker_name: String, $description: String) {
-        insert_user_asset(
-          p_user_id: $user_id,
-          p_type: $type,
-          p_name: $name,
-          p_balance: $balance,
-          p_currency: $currency,
-          p_account_number: $account_number,
-          p_bank_name: $bank_name,
-          p_broker_name: $broker_name,
-          p_description: $description
-        )
-      }`,
-      {
-        user_id: user.id,
-        type: newAsset.type,
-        name: newAsset.name,
-        balance: parseFloat(newAsset.balance),
-        currency: newAsset.currency,
-        account_number: newAsset.account_number || null,
-        bank_name: newAsset.bank_name || null,
-        broker_name: newAsset.broker_name || null,
-        description: newAsset.description || null,
-      }
-    );
+    // Use direct REST API to bypass Hasura mutation tracking issue
+    const result = await insertAssetDirect({
+      user_id: user.id,
+      type: newAsset.type,
+      name: newAsset.name,
+      balance: parseFloat(newAsset.balance),
+      currency: newAsset.currency,
+      account_number: newAsset.account_number || undefined,
+      bank_name: newAsset.bank_name || undefined,
+      broker_name: newAsset.broker_name || undefined,
+      description: newAsset.description || undefined,
+    });
 
     if (result.error) {
       toast({
