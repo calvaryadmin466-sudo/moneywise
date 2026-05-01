@@ -19,11 +19,13 @@ export default function TransactionsContent() {
   const currency = (searchParams.get("currency") as Currency) || "TZS";
 
   const [transactions, setTransactions] = React.useState<Transaction[]>([]);
+  const [assets, setAssets] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
   const [filterType, setFilterType] = React.useState<string>("all");
   const [filterCategory, setFilterCategory] = React.useState<string>("all");
   const [isEditOpen, setIsEditOpen] = React.useState(false);
+  const [isAddOpen, setIsAddOpen] = React.useState(false);
   const [editingTransaction, setEditingTransaction] = React.useState<Transaction | null>(null);
 
   const [formData, setFormData] = React.useState({
@@ -33,13 +35,14 @@ export default function TransactionsContent() {
     date: new Date().toISOString().split("T")[0],
     note: "",
     is_recurring: false,
+    asset_id: "" as string,
   });
 
   React.useEffect(() => {
-    fetchTransactions();
+    fetchTransactionsAndAssets();
   }, []);
 
-  async function fetchTransactions() {
+  async function fetchTransactionsAndAssets() {
     setLoading(true);
     const user = await getUser();
     const userId = user?.id;
@@ -47,8 +50,15 @@ export default function TransactionsContent() {
       setLoading(false);
       return;
     }
-    const result = await gqlRequest(`query { transactions(where: {user_id: {_eq: "${userId}"}}, order_by: {date: desc}) { id user_id type amount category date note is_recurring created_at } }`);
-    if (result.data?.transactions) setTransactions(result.data.transactions);
+    
+    // Fetch both transactions and assets
+    const [transRes, assetsRes] = await Promise.all([
+      gqlRequest(`query { transactions(where: {user_id: {_eq: "${userId}"}}, order_by: {date: desc}) { id user_id type amount category date note is_recurring created_at } }`),
+      gqlRequest(`query { user_assets(where: {user_id: {_eq: "${userId}"}}) { id name type balance currency } }`),
+    ]);
+    
+    if (transRes.data?.transactions) setTransactions(transRes.data.transactions);
+    if (assetsRes.data?.user_assets) setAssets(assetsRes.data.user_assets);
     setLoading(false);
   }
 
@@ -56,14 +66,38 @@ export default function TransactionsContent() {
     const user = await getUser();
     const userId = user?.id;
     if (!userId) return;
+    
+    const amount = Number(formData.amount);
+    
+    // Add transaction
     const result = await gqlRequest(
       `mutation($type: String!, $amount: numeric!, $category: String!, $date: date!, $note: String, $isRecurring: Boolean!, $userId: uuid!) {
         insert_transactions(objects: [{type: $type, amount: $amount, category: $category, date: $date, note: $note, is_recurring: $isRecurring, user_id: $userId}]) { affected_rows }
       }`,
-      { type: formData.type, amount: Number(formData.amount), category: formData.category, date: formData.date, note: formData.note || null, isRecurring: formData.is_recurring, userId }
+      { type: formData.type, amount: amount, category: formData.category, date: formData.date, note: formData.note || null, isRecurring: formData.is_recurring, userId }
     );
+    
+    // If asset selected, update asset balance
+    if (!result.error && formData.asset_id) {
+      const selectedAsset = assets.find(a => a.id === formData.asset_id);
+      if (selectedAsset) {
+        const currentBalance = parseFloat(selectedAsset.balance) || 0;
+        const newBalance = formData.type === "income" 
+          ? currentBalance + amount 
+          : currentBalance - amount;
+        
+        await gqlRequest(
+          `mutation($id: uuid!, $balance: numeric!) {
+            update_user_assets_by_pk(pk_columns: {id: $id}, _set: {balance: $balance}) { id }
+          }`,
+          { id: formData.asset_id, balance: newBalance }
+        );
+      }
+    }
+    
     if (!result.error) {
-      fetchTransactions();
+      fetchTransactionsAndAssets();
+      setIsAddOpen(false);
       setFormData({
         type: "expense",
         amount: "",
@@ -71,6 +105,7 @@ export default function TransactionsContent() {
         date: new Date().toISOString().split("T")[0],
         note: "",
         is_recurring: false,
+        asset_id: "",
       });
     }
   }
@@ -84,9 +119,9 @@ export default function TransactionsContent() {
       { id: editingTransaction.id, type: formData.type, amount: Number(formData.amount), category: formData.category, date: formData.date, note: formData.note || null, isRecurring: formData.is_recurring }
     );
     if (!result.error) {
+      fetchTransactionsAndAssets();
       setIsEditOpen(false);
       setEditingTransaction(null);
-      fetchTransactions();
     }
   }
 
@@ -95,7 +130,7 @@ export default function TransactionsContent() {
       `mutation($id: uuid!) { delete_transactions(where: {id: {_eq: $id}}) { affected_rows } }`,
       { id }
     );
-    if (!result.error) fetchTransactions();
+    if (!result.error) fetchTransactionsAndAssets();
   }
 
   function openEdit(transaction: Transaction) {
@@ -163,6 +198,34 @@ export default function TransactionsContent() {
           </SelectContent>
         </Select>
       </div>
+      
+      {assets.length > 0 && (
+        <div className="space-y-2">
+          <Label>Link to Asset (Optional)</Label>
+          <Select
+            value={formData.asset_id}
+            onValueChange={(v: string) => setFormData({ ...formData, asset_id: v })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select asset to update..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">No asset (transaction only)</SelectItem>
+              {assets.map((asset) => (
+                <SelectItem key={asset.id} value={asset.id}>
+                  {asset.name} ({asset.type}) - {asset.currency} {parseFloat(asset.balance).toLocaleString()}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-gray-500">
+            {formData.type === "income" 
+              ? "Income will ADD to selected asset balance" 
+              : "Expense will SUBTRACT from selected asset balance"}
+          </p>
+        </div>
+      )}
+      
       <div className="space-y-2">
         <Label>Date</Label>
         <Input

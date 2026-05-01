@@ -109,7 +109,7 @@ export default function AssetsPage() {
 
     const result = await gqlRequest(
       `mutation($user_id: uuid!, $type: String!, $name: String!, $balance: numeric!, $currency: String!, $account_number: String, $bank_name: String, $broker_name: String, $description: String) {
-        insert_user_assets(objects: [{
+        insert_user_assets_one(object: {
           user_id: $user_id,
           type: $type,
           name: $name,
@@ -119,8 +119,8 @@ export default function AssetsPage() {
           bank_name: $bank_name,
           broker_name: $broker_name,
           description: $description
-        }]) {
-          returning { id }
+        }) {
+          id
         }
       }`,
       {
