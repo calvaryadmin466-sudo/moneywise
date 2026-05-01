@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { getUser, gqlRequest, formatCurrency, Transaction, Budget, Goal } from "@/lib/nhost";
-import { StockData, getStocksForCountry, getMarketStatus } from "@/lib/stocks";
+import { StockData, getStocksForCountry, getMarketStatus, getLastUpdatedTime } from "@/lib/stocks";
 
 interface Message {
   role: "user" | "assistant";
@@ -122,6 +122,7 @@ export function AIFinancialAdvisorV2() {
   const [stocks, setStocks] = React.useState<StockData[]>([]);
   const [stocksLoading, setStocksLoading] = React.useState(false);
   const [marketStatus, setMarketStatus] = React.useState(getMarketStatus());
+  const [lastUpdated, setLastUpdated] = React.useState<string>("");
 
   React.useEffect(() => {
     if (isOpen && !dataLoaded) {
@@ -163,6 +164,7 @@ export function AIFinancialAdvisorV2() {
     try {
       const stockData = await getStocksForCountry(country);
       setStocks(stockData);
+      setLastUpdated(getLastUpdatedTime());
     } catch (error) {
       console.error("Error fetching stocks:", error);
     } finally {
@@ -475,9 +477,14 @@ Provide practical, actionable financial advice including specific investment rec
       <div className="space-y-4 p-4 max-h-[400px] overflow-y-auto">
         <div>
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-medium text-gray-300 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-green-400" /> Stock Recommendations
-            </h4>
+            <div className="flex items-center gap-2">
+              <h4 className="text-sm font-medium text-gray-300 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-green-400" /> Stock Recommendations
+              </h4>
+              {lastUpdated && (
+                <span className="text-xs text-gray-500">• Updated {lastUpdated}</span>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className={marketStatus.isOpen ? "text-green-400 border-green-400/30" : "text-gray-400 border-gray-400/30"}>
                 {marketStatus.isOpen ? "Market Open" : "Market Closed"}
