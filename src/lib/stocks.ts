@@ -107,7 +107,12 @@ export function getLastUpdatedTime(): string {
 
 // Get stocks for user's country
 export async function getStocksForCountry(countryCode: string): Promise<StockData[]> {
-  const symbols = REGIONAL_STOCKS[countryCode as keyof typeof REGIONAL_STOCKS] || REGIONAL_STOCKS.US;
+  const normalizedCode = countryCode?.toUpperCase() || 'US';
+  console.log('Fetching stocks for country:', normalizedCode);
+  
+  const symbols = REGIONAL_STOCKS[normalizedCode as keyof typeof REGIONAL_STOCKS] || REGIONAL_STOCKS.TZ;
+  console.log('Stock symbols:', symbols);
+  
   return fetchMultipleStocks(symbols);
 }
 

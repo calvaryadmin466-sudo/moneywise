@@ -69,15 +69,14 @@ export function PWAInstallPrompt() {
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
 
-    // iOS: show manual instructions after delay
+    // Show install prompt after delay for all platforms
+    // Chrome requires HTTPS for native install, so we always show manual instructions
     let timer: ReturnType<typeof setTimeout> | null = null;
-    if (platform === 'ios') {
-      timer = setTimeout(() => {
-        if (!wasDismissedRecently()) {
-          setShowPrompt(true);
-        }
-      }, 3000);
-    }
+    timer = setTimeout(() => {
+      if (!wasDismissedRecently()) {
+        setShowPrompt(true);
+      }
+    }, 2000);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
