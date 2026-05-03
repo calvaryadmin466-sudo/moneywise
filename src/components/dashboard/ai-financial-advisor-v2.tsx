@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { getUser, gqlRequest, formatCurrency, Transaction, Budget, Goal } from "@/lib/nhost";
+import { supabase, getUser } from "@/lib/supabase";
+import { formatCurrency, Transaction, Budget, Goal } from "@/lib/nhost";
 import { StockData, getStocksForCountry, getMarketStatus, getLastUpdatedTime } from "@/lib/stocks";
 
 interface Message {
@@ -137,27 +138,27 @@ export function AIFinancialAdvisorV2() {
     if (!userId) return;
 
     const [transRes, budgetRes, goalsRes, profileRes, assetsRes] = await Promise.all([
-      gqlRequest(`query { transactions(where: {user_id: {_eq: "${userId}"}}, order_by: {date: desc}, limit: 100) { id type amount category date note } }`),
-      gqlRequest(`query { budgets(where: {user_id: {_eq: "${userId}"}}) { id category monthly_limit month } }`),
-      gqlRequest(`query { goals(where: {user_id: {_eq: "${userId}"}}) { id name target_amount saved_amount deadline } }`),
-      gqlRequest(`query { user_profiles_by_pk(id: "${userId}") { country currency_preference } }`),
-      gqlRequest(`query { user_assets(where: {user_id: {_eq: "${userId}"}}) { id type name balance currency account_number bank_name broker_name description updated_at } }`),
+      supabase.from('transactions').select('id, type, amount, category, date, note').eq('user_id', userId).order('date', { ascending: false }).limit(100),
+      supabase.from('budgets').select('id, category, monthly_limit, month').eq('user_id', userId),
+      supabase.from('goals').select('id, name, target_amount, saved_amount, deadline').eq('user_id', userId),
+      supabase.from('user_profiles').select('country, currency_preference').eq('id', userId).single(),
+      supabase.from('user_assets').select('id, type, name, balance, currency, account_number, bank_name, broker_name, description, updated_at').eq('user_id', userId),
     ]);
 
-    if (transRes.data?.transactions) setTransactions(transRes.data.transactions);
-    if (budgetRes.data?.budgets) setBudgets(budgetRes.data.budgets);
-    if (goalsRes.data?.goals) setGoals(goalsRes.data.goals);
-    if (profileRes.data?.user_profiles_by_pk) {
-      setUserProfile(profileRes.data.user_profiles_by_pk);
+    if (transRes.data) setTransactions(transRes.data);
+    if (budgetRes.data) setBudgets(budgetRes.data);
+    if (goalsRes.data) setGoals(goalsRes.data);
+    if (profileRes.data) {
+      setUserProfile(profileRes.data);
     }
-    if (assetsRes.data?.user_assets) setAssets(assetsRes.data.user_assets);
+    if (assetsRes.data) setAssets(assetsRes.data);
 
     // Analyze behavior and generate forecasts
     analyzeBehavior(transRes.data?.transactions || []);
     generateForecasts(transRes.data?.transactions || [], goalsRes.data?.goals || []);
     
     // Fetch stocks for user's country
-    await fetchStocks(profileRes.data?.user_profiles_by_pk?.country || "US");
+    await fetchStocks(profileRes.data?.country || "US");
     
     setDataLoaded(true);
   }

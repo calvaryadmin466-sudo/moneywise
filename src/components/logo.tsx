@@ -9,7 +9,7 @@ interface LogoProps {
 export function Logo({ className = "", width = 48, height = 48 }: LogoProps) {
   return (
     <Image
-      src="/logo.png"
+      src="/logo.svg"
       alt="Money-Wise Logo"
       width={width}
       height={height}

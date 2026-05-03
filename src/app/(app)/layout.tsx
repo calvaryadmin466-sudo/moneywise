@@ -38,7 +38,7 @@ import { SpendingInsightsDialog } from "@/components/dashboard/spending-insights
 import { AIFinancialAdvisorV2 } from "@/components/dashboard/ai-financial-advisor-v2";
 import { MobileNav } from "@/components/mobile-nav";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getUser, gqlRequest, signOut } from "@/lib/nhost";
+import { supabase, getUser } from "@/lib/supabase";
 import { Transaction } from "@/lib/nhost";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -70,10 +70,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       const userId = user?.id;
       if (!userId) return;
       
-      const result = await gqlRequest(`query { transactions(where: {user_id: {_eq: "${userId}"}}, order_by: {date: desc}) { id user_id type amount category date note is_recurring created_at } }`);
+      const { data } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('date', { ascending: false });
       
-      if (result.data?.transactions) {
-        setTransactions(result.data.transactions);
+      if (data) {
+        setTransactions(data);
       }
     }
     fetchTransactions();
@@ -184,7 +188,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
             <button
               onClick={async () => {
-                await signOut();
+                await supabase.auth.signOut();
                 router.push('/login');
               }}
               className="p-2 rounded-lg hover:bg-white/10 text-gray-400 hover:text-red-400 transition-colors"

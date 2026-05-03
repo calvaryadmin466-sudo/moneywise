@@ -5,7 +5,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
-import { getUser, gqlRequest, CATEGORIES } from "@/lib/nhost";
+import { supabase, getUser } from "@/lib/supabase";
+import { CATEGORIES } from "@/lib/nhost";
 import type { Transaction } from "@/lib/nhost";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -87,17 +88,22 @@ export function AddTransactionSheet({
     const userId = user?.id;
     if (!userId) return;
     
-    const result = await gqlRequest(
-      `mutation($type: String!, $amount: numeric!, $category: String!, $date: date!, $note: String, $isRecurring: Boolean!, $userId: uuid!) {
-        insert_transactions(objects: [{type: $type, amount: $amount, category: $category, date: $date, note: $note, is_recurring: $isRecurring, user_id: $userId}]) { affected_rows }
-      }`,
-      { type: data.type, amount: data.amount, category: data.category, date: format(data.date, "yyyy-MM-dd"), note: data.notes || null, isRecurring: false, userId }
-    );
+    const { error } = await supabase
+      .from('transactions')
+      .insert({
+        user_id: userId,
+        type: data.type,
+        amount: data.amount,
+        category: data.category,
+        date: format(data.date, "yyyy-MM-dd"),
+        note: data.notes || null,
+        is_recurring: false,
+      });
     
-    if (result.error) {
+    if (error) {
       toast({
         title: "Error",
-        description: result.error,
+        description: error.message,
         variant: "destructive",
       });
       return;
