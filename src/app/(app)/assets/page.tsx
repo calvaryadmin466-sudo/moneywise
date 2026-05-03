@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { getUser, gqlRequest, insertAssetDirect } from "@/lib/nhost";
+import { supabase, getUser } from "@/lib/supabase";
 import { 
   Wallet, 
   Building2, 
@@ -74,23 +74,14 @@ export default function AssetsPage() {
     const user = await getUser();
     if (!user) return;
 
-    const result = await gqlRequest(`
-      query {
-        user_assets(where: {user_id: {_eq: "${user.id}"}, is_active: {_eq: true}}, order_by: {created_at: desc}) {
-          id
-          type
-          name
-          balance
-          currency
-          account_number
-          bank_name
-          broker_name
-          description
-        }
-      }
-    `);
-
-    setAssets(result.data?.user_assets || []);
+    const { data, error } = await supabase
+      .from('user_assets')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+    
+    if (data) setAssets(data);
+    if (error) console.error('Error loading assets:', error);
     setLoading(false);
   }
 
@@ -107,29 +98,33 @@ export default function AssetsPage() {
       return;
     }
 
-    // Use direct REST API to bypass Hasura mutation tracking issue
-    const result = await insertAssetDirect({
-      user_id: user.id,
-      type: newAsset.type,
-      name: newAsset.name,
-      balance: parseFloat(newAsset.balance),
-      currency: newAsset.currency,
-      account_number: newAsset.account_number || undefined,
-      bank_name: newAsset.bank_name || undefined,
-      broker_name: newAsset.broker_name || undefined,
-      description: newAsset.description || undefined,
-    });
+    // Insert asset using Supabase
+    const { data, error } = await supabase
+      .from('user_assets')
+      .insert({
+        user_id: user.id,
+        type: newAsset.type,
+        name: newAsset.name,
+        balance: parseFloat(newAsset.balance),
+        currency: newAsset.currency,
+        account_number: newAsset.account_number || null,
+        bank_name: newAsset.bank_name || null,
+        broker_name: newAsset.broker_name || null,
+        description: newAsset.description || null,
+      })
+      .select()
+      .single();
 
-    if (result.error) {
+    if (error) {
       toast({
         title: "Error",
-        description: result.error,
+        description: error.message,
         variant: "destructive",
       });
     } else {
       toast({
         title: "Success",
-        description: "Asset added successfully!",
+        description: "Asset added successfully",
       });
       setShowAddDialog(false);
       setNewAsset({
@@ -175,22 +170,17 @@ export default function AssetsPage() {
       return;
     }
 
-    // Use stored procedure for update
-    const result = await gqlRequest(
-      `mutation($id: uuid!, $user_id: uuid!, $balance: numeric!) {
-        update_user_asset(
-          p_id: $id,
-          p_user_id: $user_id,
-          p_balance: $balance
-        )
-      }`,
-      { id: updateAsset.id, user_id: user.id, balance: newBalance }
-    );
+    // Update using Supabase
+    const { error } = await supabase
+      .from('user_assets')
+      .update({ balance: newBalance, updated_at: new Date().toISOString() })
+      .eq('id', updateAsset.id)
+      .eq('user_id', user.id);
 
-    if (result.error) {
+    if (error) {
       toast({
         title: "Error",
-        description: result.error,
+        description: error.message,
         variant: "destructive",
       });
     } else {
@@ -208,18 +198,14 @@ export default function AssetsPage() {
     const user = await getUser();
     if (!user) return;
     
-    // Use stored procedure for delete
-    const result = await gqlRequest(
-      `mutation($id: uuid!, $user_id: uuid!) {
-        delete_user_asset(
-          p_id: $id,
-          p_user_id: $user_id
-        )
-      }`,
-      { id: assetId, user_id: user.id }
-    );
+    // Delete using Supabase
+    const { error } = await supabase
+      .from('user_assets')
+      .delete()
+      .eq('id', assetId)
+      .eq('user_id', user.id);
 
-    if (!result.error) {
+    if (!error) {
       toast({
         title: "Deleted",
         description: "Asset removed successfully",

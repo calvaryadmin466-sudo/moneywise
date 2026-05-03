@@ -14,14 +14,14 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: '/icon.svg', type: 'image/svg+xml', sizes: 'any' },
-      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+      { url: '/icon.png', sizes: '512x512', type: 'image/png' },
+      { url: '/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512x512.png', sizes: '512x512', type: 'image/png' },
     ],
     apple: [
-      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/icon.png', sizes: '512x512', type: 'image/png' },
     ],
-    shortcut: [{ url: '/icon.svg' }],
+    shortcut: [{ url: '/icon.png' }],
   },
 };
 
@@ -54,7 +54,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="MoneyWise" />
         <meta name="application-name" content="MoneyWise" />
         <meta name="msapplication-TileColor" content="#01ccb8" />
-        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+        <link rel="icon" href="/icon.png" type="image/png" />
         <meta name="msapplication-tap-highlight" content="no" />
         <meta name="format-detection" content="telephone=no" />
       </head>
