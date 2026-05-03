@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { getUser, gqlRequest, formatCurrency, Currency, Goal } from "@/lib/nhost";
+import { supabase, getUser } from "@/lib/supabase";
+import { formatCurrency, Currency, Goal } from "@/lib/nhost";
 import { useSearchParams } from "next/navigation";
 
 export default function GoalsContent() {
@@ -41,8 +42,12 @@ export default function GoalsContent() {
       setLoading(false);
       return;
     }
-    const result = await gqlRequest(`query { goals(where: {user_id: {_eq: "${userId}"}}, order_by: {created_at: desc}) { id user_id name target_amount saved_amount deadline created_at } }`);
-    if (result.data?.goals) setGoals(result.data.goals);
+    const { data, error } = await supabase
+      .from('goals')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (data) setGoals(data);
     setLoading(false);
   }
 
@@ -50,13 +55,16 @@ export default function GoalsContent() {
     const user = await getUser();
     const userId = user?.id;
     if (!userId) return;
-    const result = await gqlRequest(
-      `mutation($name: String!, $targetAmount: numeric!, $deadline: String, $userId: uuid!) {
-        insert_goals(objects: [{name: $name, target_amount: $targetAmount, deadline: $deadline, user_id: $userId}]) { affected_rows }
-      }`,
-      { name: formData.name, targetAmount: Number(formData.target_amount), deadline: formData.deadline || null, userId }
-    );
-    if (!result.error) {
+    const { error } = await supabase
+      .from('goals')
+      .insert({
+        name: formData.name,
+        target_amount: Number(formData.target_amount),
+        saved_amount: 0,
+        deadline: formData.deadline || null,
+        user_id: userId,
+      });
+    if (!error) {
       setIsAddOpen(false);
       fetchGoals();
       setFormData({ name: "", target_amount: "", deadline: "" });
@@ -64,21 +72,18 @@ export default function GoalsContent() {
   }
 
   async function deleteGoal(id: string) {
-    await gqlRequest(
-      `mutation($id: uuid!) { delete_goals(where: {id: {_eq: $id}}) { affected_rows } }`,
-      { id }
-    );
+    await supabase.from('goals').delete().eq('id', id);
     fetchGoals();
   }
 
   async function addFunds() {
     if (!selectedGoal) return;
-    const newAmount = Number(selectedGoal.saved_amount) + Number(contributeAmount);
-    const result = await gqlRequest(
-      `mutation($id: uuid!, $savedAmount: numeric!) { update_goals(where: {id: {_eq: $id}}, _set: {saved_amount: $savedAmount}) { affected_rows } }`,
-      { id: selectedGoal.id, savedAmount: newAmount }
-    );
-    if (!result.error) {
+    const newSaved = selectedGoal.saved_amount + Number(contributeAmount);
+    const { error } = await supabase
+      .from('goals')
+      .update({ saved_amount: newSaved, updated_at: new Date().toISOString() })
+      .eq('id', selectedGoal.id);
+    if (!error) {
       setIsContributeOpen(false);
       setSelectedGoal(null);
       setContributeAmount("");

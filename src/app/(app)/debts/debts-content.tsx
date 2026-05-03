@@ -10,7 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getUser, gqlRequest, formatCurrency, Currency, Debt } from "@/lib/nhost";
+import { supabase, getUser } from "@/lib/supabase";
+import { formatCurrency, Currency, Debt } from "@/lib/nhost";
 import { useSearchParams } from "next/navigation";
 
 export default function DebtsContent() {
@@ -40,8 +41,12 @@ export default function DebtsContent() {
       setLoading(false);
       return;
     }
-    const result = await gqlRequest(`query { debts(where: {user_id: {_eq: "${userId}"}}, order_by: {created_at: desc}) { id user_id name amount direction is_paid due_date created_at } }`);
-    if (result.data?.debts) setDebts(result.data.debts);
+    const { data, error } = await supabase
+      .from('debts')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (data) setDebts(data);
     setLoading(false);
   }
 
@@ -49,13 +54,16 @@ export default function DebtsContent() {
     const user = await getUser();
     const userId = user?.id;
     if (!userId) return;
-    const result = await gqlRequest(
-      `mutation($name: String!, $amount: numeric!, $direction: String!, $dueDate: String, $userId: uuid!) {
-        insert_debts(objects: [{name: $name, amount: $amount, direction: $direction, due_date: $dueDate, user_id: $userId}]) { affected_rows }
-      }`,
-      { name: formData.name, amount: Number(formData.amount), direction: formData.direction, dueDate: formData.due_date || null, userId }
-    );
-    if (!result.error) {
+    const { error } = await supabase
+      .from('debts')
+      .insert({
+        name: formData.name,
+        amount: Number(formData.amount),
+        direction: formData.direction,
+        due_date: formData.due_date || null,
+        user_id: userId,
+      });
+    if (!error) {
       setIsOpen(false);
       fetchDebts();
       setFormData({ name: "", amount: "", direction: "i_owe", due_date: "" });
@@ -63,18 +71,15 @@ export default function DebtsContent() {
   }
 
   async function togglePaid(id: string, currentStatus: boolean) {
-    await gqlRequest(
-      `mutation($id: uuid!, $isPaid: Boolean!) { update_debts(where: {id: {_eq: $id}}, _set: {is_paid: $isPaid}) { affected_rows } }`,
-      { id, isPaid: !currentStatus }
-    );
+    await supabase
+      .from('debts')
+      .update({ is_paid: !currentStatus })
+      .eq('id', id);
     fetchDebts();
   }
 
   async function deleteDebt(id: string) {
-    await gqlRequest(
-      `mutation($id: uuid!) { delete_debts(where: {id: {_eq: $id}}) { affected_rows } }`,
-      { id }
-    );
+    await supabase.from('debts').delete().eq('id', id);
     fetchDebts();
   }
 
