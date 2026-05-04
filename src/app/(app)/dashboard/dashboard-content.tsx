@@ -28,7 +28,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getUser, gqlRequest, formatCurrency, Currency, Transaction, Budget, Goal, CATEGORIES } from "@/lib/nhost";
+import { supabase, getUser } from "@/lib/supabase";
+import { formatCurrency, Currency, Transaction, Budget, Goal, CATEGORIES } from "@/lib/nhost";
 import { useSearchParams } from "next/navigation";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
@@ -60,14 +61,14 @@ export default function DashboardContent() {
       return;
     }
     const [transRes, budgetRes, goalsRes] = await Promise.all([
-      gqlRequest(`query { transactions(where: {user_id: {_eq: "${userId}"}}, order_by: {date: desc}) { id user_id type amount category date note is_recurring created_at } }`),
-      gqlRequest(`query { budgets(where: {user_id: {_eq: "${userId}"}}) { id user_id category monthly_limit month created_at } }`),
-      gqlRequest(`query { goals(where: {user_id: {_eq: "${userId}"}}, order_by: {created_at: desc}) { id user_id name target_amount saved_amount deadline created_at } }`),
+      supabase.from('transactions').select('id, user_id, type, amount, category, date, note, is_recurring, created_at').eq('user_id', userId).order('date', { ascending: false }),
+      supabase.from('budgets').select('id, user_id, category, monthly_limit, month, created_at').eq('user_id', userId),
+      supabase.from('goals').select('id, user_id, name, target_amount, saved_amount, deadline, created_at').eq('user_id', userId).order('created_at', { ascending: false }),
     ]);
     
-    if (transRes.data?.transactions) setTransactions(transRes.data.transactions);
-    if (budgetRes.data?.budgets) setBudgets(budgetRes.data.budgets);
-    if (goalsRes.data?.goals) setGoals(goalsRes.data.goals);
+    if (transRes.data) setTransactions(transRes.data);
+    if (budgetRes.data) setBudgets(budgetRes.data);
+    if (goalsRes.data) setGoals(goalsRes.data);
     setLoading(false);
   }
 
@@ -76,13 +77,16 @@ export default function DashboardContent() {
     const user = await getUser();
     const userId = user?.id;
     if (!userId) return;
-    const result = await gqlRequest(
-      `mutation($type: String!, $amount: numeric!, $category: String!, $date: date!, $note: String, $isRecurring: Boolean!, $userId: uuid!) {
-        insert_transactions(objects: [{type: $type, amount: $amount, category: $category, date: $date, note: $note, is_recurring: $isRecurring, user_id: $userId}]) { affected_rows }
-      }`,
-      { type: "expense", amount: Number(checkInAmount), category: checkInCategory, date: new Date().toISOString().split("T")[0], note: "Daily check-in", isRecurring: false, userId }
-    );
-    if (!result.error) {
+    const { error } = await supabase.from('transactions').insert({
+      user_id: userId,
+      type: "expense",
+      amount: Number(checkInAmount),
+      category: checkInCategory,
+      date: new Date().toISOString().split("T")[0],
+      note: "Daily check-in",
+      is_recurring: false,
+    });
+    if (!error) {
       setShowCheckIn(false);
       setCheckInAmount("");
       fetchData();
