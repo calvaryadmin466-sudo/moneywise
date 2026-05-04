@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { gqlRequest, getUser, saveProfileDirect } from "@/lib/nhost";
+import { supabase, getUser } from "@/lib/supabase";
 import { Camera, LogOut, User, Mail, Globe, DollarSign, Loader2, Upload } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -63,21 +63,14 @@ export default function ProfilePage() {
       return;
     }
 
-    const result = await gqlRequest(`
-      query {
-        user_profiles_by_pk(id: "${user.id}") {
-          display_name
-          email
-          avatar_url
-          currency_preference
-          country
-          phone
-        }
-      }
-    `);
+    const { data } = await supabase
+      .from('user_profiles')
+      .select('display_name, email, avatar_url, currency_preference, country, phone')
+      .eq('id', user.id)
+      .single();
 
-    if (result.data?.user_profiles_by_pk) {
-      setProfile(result.data.user_profiles_by_pk);
+    if (data) {
+      setProfile(data);
     } else {
       // Set email from auth user
       setProfile(prev => ({ ...prev, email: user.email }));
@@ -89,21 +82,23 @@ export default function ProfilePage() {
     const user = await getUser();
     if (!user) return;
 
-    // Use direct REST API to bypass Hasura mutation tracking issue
-    const result = await saveProfileDirect({
-      id: user.id,
-      display_name: profile.display_name,
-      email: profile.email,
-      avatar_url: profile.avatar_url,
-      currency_preference: profile.currency_preference,
-      country: profile.country,
-      phone: profile.phone,
-    });
+    const { error } = await supabase
+      .from('user_profiles')
+      .upsert({
+        id: user.id,
+        display_name: profile.display_name,
+        email: profile.email,
+        avatar_url: profile.avatar_url,
+        currency_preference: profile.currency_preference,
+        country: profile.country,
+        phone: profile.phone,
+        updated_at: new Date().toISOString(),
+      });
 
-    if (result.error) {
+    if (error) {
       toast({
         title: "Error",
-        description: result.error,
+        description: error.message,
         variant: "destructive",
       });
     } else {
@@ -116,7 +111,7 @@ export default function ProfilePage() {
   }
 
   async function handleLogout() {
-    await signOut();
+    await supabase.auth.signOut();
     router.push("/login");
   }
 
@@ -157,45 +152,32 @@ export default function ProfilePage() {
         // Update local state for preview
         setProfile(prev => ({ ...prev, avatar_url: base64String }));
 
-        // Upload to Nhost storage
-        const token = await getAccessToken();
-        const storageUrl = process.env.NEXT_PUBLIC_NHOST_STORAGE_URL || 
-          `https://wxtreqbjcljlcoobxoea.storage.eu-central-1.nhost.run/v1`;
+        // Upload to Supabase Storage
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(fileName, file, { upsert: true });
 
-        const formData = new FormData();
-        formData.append('file', file);
-
-        const uploadRes = await fetch(`${storageUrl}/files`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          body: formData,
-        });
-
-        if (!uploadRes.ok) {
-          throw new Error('Failed to upload image');
+        if (uploadError) {
+          throw new Error(uploadError.message);
         }
 
-        const uploadData = await uploadRes.json();
-        const imageUrl = `${storageUrl}/files/${uploadData.id}`;
+        const { data: { publicUrl } } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(fileName);
 
         // Update profile with new image URL
-        await gqlRequest(
-          `
-          mutation($id: uuid!, $avatar_url: String) {
-            insert_user_profiles_one(object: {
-              id: $id,
-              avatar_url: $avatar_url
-            }, on_conflict: { constraint: user_profiles_id_key, update_columns: [avatar_url] }) {
-              id
-            }
-          }
-        `,
-          { id: user.id, avatar_url: imageUrl }
-        );
+        await supabase
+          .from('user_profiles')
+          .upsert({
+            id: user.id,
+            avatar_url: publicUrl,
+            updated_at: new Date().toISOString(),
+          });
 
-        setProfile(prev => ({ ...prev, avatar_url: imageUrl }));
+        setProfile(prev => ({ ...prev, avatar_url: publicUrl }));
         
         toast({
           title: "Success",
