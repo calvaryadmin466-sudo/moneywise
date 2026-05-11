@@ -265,7 +265,7 @@ export default function TransactionsContent() {
 
   if (loading) {
     return (
-      <main className="flex-1 space-y-6 bg-background/50 p-4 sm:p-6">
+      <main className="flex-1 space-y-6 bg-background/50 p-4 sm:p-6 overflow-x-auto">
         <div className="flex items-center justify-between">
           <Skeleton className="h-8 w-48" />
         </div>
@@ -301,7 +301,7 @@ export default function TransactionsContent() {
   }
 
   return (
-    <main className="flex-1 space-y-6 bg-background/50 p-4 sm:p-6">
+    <main className="flex-1 space-y-6 bg-background/50 p-4 sm:p-6 overflow-x-auto">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Transactions</h1>

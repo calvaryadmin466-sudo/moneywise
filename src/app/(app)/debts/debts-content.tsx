@@ -151,7 +151,7 @@ export default function DebtsContent() {
   if (loading) return <div className="p-6">Loading...</div>;
 
   return (
-    <main className="flex-1 space-y-6 bg-background/50 p-4 sm:p-6">
+    <main className="flex-1 space-y-6 bg-background/50 p-4 sm:p-6 overflow-x-auto">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Debts</h1>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>

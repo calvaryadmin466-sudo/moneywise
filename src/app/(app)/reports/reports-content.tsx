@@ -154,7 +154,7 @@ export default function ReportsContent() {
 
   if (loading) {
     return (
-      <main className="flex-1 space-y-6 bg-background/50 p-4 sm:p-6">
+      <main className="flex-1 space-y-6 bg-background/50 p-4 sm:p-6 overflow-x-auto">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <Skeleton className="h-8 w-32" />
           <div className="flex gap-2">

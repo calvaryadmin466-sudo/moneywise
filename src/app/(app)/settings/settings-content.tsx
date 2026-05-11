@@ -41,7 +41,7 @@ export default function SettingsContent() {
   }
 
   return (
-    <main className="flex-1 space-y-6 bg-background/50 p-4 sm:p-6">
+    <main className="flex-1 space-y-6 bg-background/50 p-4 sm:p-6 overflow-x-auto">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
         <p className="text-sm text-muted-foreground mt-1">

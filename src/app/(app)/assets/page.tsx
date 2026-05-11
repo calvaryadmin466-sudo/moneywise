@@ -253,7 +253,7 @@ export default function AssetsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0f172a] p-4 md:p-8">
+    <main className="flex-1 space-y-6 bg-background/50 p-4 sm:p-6 overflow-x-auto">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -579,6 +579,6 @@ export default function AssetsPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </main>
   );
 }

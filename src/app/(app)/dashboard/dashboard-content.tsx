@@ -340,7 +340,7 @@ export default function DashboardContent() {
   if (loading) return <div className="p-6">Loading...</div>;
 
   return (
-    <main className="flex-1 space-y-6 bg-background/50 p-4 sm:p-6">
+    <main className="flex-1 space-y-6 bg-background/50 p-4 sm:p-6 overflow-x-auto">
       {smartAlerts.length > 0 && (
         <div className="space-y-2">
           {smartAlerts.map((alert, idx) => (
