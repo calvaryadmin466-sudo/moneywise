@@ -53,10 +53,17 @@ export default function SignupPage() {
           description: result.error.message,
           variant: "destructive",
         });
+      } else if (result.user) {
+        toast({
+          title: "Success",
+          description: "Account created! Welcome to MoneyWise!",
+        });
+        // Auto-login after signup - go directly to dashboard
+        window.location.href = "/dashboard";
       } else {
         toast({
           title: "Success",
-          description: "Account created! Please check your email to verify, then sign in.",
+          description: "Account created! Please sign in.",
         });
         window.location.href = "/login";
       }
