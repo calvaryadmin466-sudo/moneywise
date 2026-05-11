@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { signUp } from "@/lib/supabase";
+import { signUp, supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,19 +47,40 @@ export default function SignupPage() {
     try {
       const result = await signUp(email, password);
 
+      // If user was created successfully, auto-login (even if email failed)
+      if (result.user) {
+        // Try to sign in immediately to get a session
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (!signInError) {
+          toast({
+            title: "Success",
+            description: "Account created! Welcome to MoneyWise!",
+          });
+          window.location.href = "/dashboard";
+          return;
+        }
+      }
+
       if (result.error) {
+        // Check if it's just an email error but user was created
+        if (result.error.message?.toLowerCase().includes('email') && result.user) {
+          toast({
+            title: "Account Created",
+            description: "Welcome to MoneyWise! (Email notification skipped)",
+          });
+          window.location.href = "/dashboard";
+          return;
+        }
+
         toast({
           title: "Error",
           description: result.error.message,
           variant: "destructive",
         });
-      } else if (result.user) {
-        toast({
-          title: "Success",
-          description: "Account created! Welcome to MoneyWise!",
-        });
-        // Auto-login after signup - go directly to dashboard
-        window.location.href = "/dashboard";
       } else {
         toast({
           title: "Success",
