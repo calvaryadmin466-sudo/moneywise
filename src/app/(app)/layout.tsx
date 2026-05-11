@@ -48,6 +48,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isInsightsOpen, setInsightsOpen] = React.useState(false);
   const [transactions, setTransactions] = React.useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [userData, setUserData] = React.useState<{ name: string; email: string; avatar_url?: string } | null>(null);
 
   // Check auth on mount and listen for auth state changes
   React.useEffect(() => {
@@ -60,6 +61,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         router.push('/login');
       } else if (mounted) {
         setIsLoading(false);
+        // Fetch user profile data
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('full_name, avatar_url')
+          .eq('id', session.user.id)
+          .single();
+        
+        setUserData({
+          name: profile?.full_name || session.user.email?.split('@')[0] || 'User',
+          email: session.user.email || '',
+          avatar_url: profile?.avatar_url,
+        });
       }
     }
     checkAuth();
@@ -193,12 +206,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             New Transaction
           </button>
           <div className="mt-4 flex items-center gap-3 px-3 py-2 rounded-lg bg-white/5">
-            <div className="h-9 w-9 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
-              <User className="h-4 w-4 text-white" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-gray-300">User</p>
-              <p className="text-xs text-gray-500">Free Plan</p>
+            {userData?.avatar_url ? (
+              <img
+                src={userData.avatar_url}
+                alt={userData.name}
+                className="h-9 w-9 rounded-full object-cover"
+              />
+            ) : (
+              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
+                <span className="text-sm font-bold text-white">
+                  {userData?.name?.charAt(0).toUpperCase() || 'U'}
+                </span>
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-300 truncate">{userData?.name || 'User'}</p>
+              <p className="text-xs text-gray-500 truncate">{userData?.email || 'Free Plan'}</p>
             </div>
             <button
               onClick={async () => {
