@@ -203,7 +203,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0f172a] p-4 md:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0f172a] p-4 md:p-8 overflow-y-auto">
       <div className="max-w-2xl mx-auto">
         <Card className="glass-card border-cyan-500/30">
           <CardHeader className="text-center">
