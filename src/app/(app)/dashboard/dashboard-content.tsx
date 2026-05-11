@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase, getUser } from "@/lib/supabase";
 import { formatCurrency, Currency, Transaction, Budget, Goal, CATEGORIES } from "@/lib/nhost";
 import { useSearchParams } from "next/navigation";
+import { FinancialTips } from "@/components/dashboard/financial-tips";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -547,6 +548,8 @@ export default function DashboardContent() {
             </div>
           </CardContent>
         </Card>
+
+        <FinancialTips />
       </div>
 
       <Card className="glass-card border-emerald-500/20">
