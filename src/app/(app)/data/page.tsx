@@ -315,7 +315,7 @@ export default function DataPage() {
         </div>
 
         {/* Data Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="glass-card">
             <CardContent className="p-4">
               <div className="text-2xl font-bold text-cyan-400">{dataStats.transactions}</div>
@@ -343,7 +343,7 @@ export default function DataPage() {
         </div>
 
         {/* Backup & Restore */}
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {/* Export */}
           <Card className="glass-card border-cyan-500/30">
             <CardHeader>
@@ -443,7 +443,7 @@ export default function DataPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="flex items-center gap-3 p-3 bg-[#1e293b]/50 rounded-lg">
                 <Cloud className="h-8 w-8 text-cyan-400" />
                 <div>

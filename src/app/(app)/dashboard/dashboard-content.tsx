@@ -421,7 +421,7 @@ export default function DashboardContent() {
         </DialogContent>
       </Dialog>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {/* Net Worth Card - Most Important */}
         <Card className="glass-card relative overflow-hidden bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 border-violet-500/30">
           <div className="absolute top-0 right-0 p-3 opacity-20">
@@ -522,7 +522,7 @@ export default function DashboardContent() {
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2">
         <Card className="glass-card border-cyan-500/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-cyan-400">
@@ -651,7 +651,7 @@ export default function DashboardContent() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {activeGoals.map((goal) => {
                 const percentage = (Number(goal.saved_amount) / Number(goal.target_amount)) * 100;
                 return (

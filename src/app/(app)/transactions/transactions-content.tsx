@@ -271,7 +271,7 @@ export default function TransactionsContent() {
         </div>
         <Card>
           <CardContent className="pt-6">
-            <div className="grid gap-4 sm:grid-cols-4">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-10 w-full" />

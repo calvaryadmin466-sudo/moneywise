@@ -168,7 +168,7 @@ export default function BudgetsContent() {
       </div>
 
       {/* Budget Progress */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
         {budgetProgress.map((budget) => (
           <Card key={budget.id}>
             <CardContent className="pt-6">

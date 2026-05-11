@@ -162,12 +162,12 @@ export default function ReportsContent() {
             <Skeleton className="h-10 w-32" />
           </div>
         </div>
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           <Skeleton className="h-28" />
           <Skeleton className="h-28" />
           <Skeleton className="h-28" />
         </div>
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
           <Skeleton className="h-80" />
           <Skeleton className="h-80" />
         </div>
