@@ -197,6 +197,21 @@ export default function DashboardContent() {
     ? ((totalExpenses - lastMonthExpenses) / lastMonthExpenses * 100).toFixed(0)
     : "0";
 
+  const incomeChange = React.useMemo(() => {
+    const lastMonth = new Date();
+    lastMonth.setMonth(lastMonth.getMonth() - 1);
+    const lastMonthStr = lastMonth.toISOString().slice(0, 7);
+    let lastMonthIncome = 0;
+    transactions.forEach((t) => {
+      if (t.date.startsWith(lastMonthStr) && t.type === "income") {
+        lastMonthIncome += Number(t.amount);
+      }
+    });
+    return lastMonthIncome > 0 
+      ? ((totalIncome - lastMonthIncome) / lastMonthIncome * 100).toFixed(0)
+      : "0";
+  }, [transactions, totalIncome]);
+
   const smartAlerts = React.useMemo(() => {
     const alerts: { type: string; message: string; category?: string }[] = [];
     
@@ -459,9 +474,10 @@ export default function DashboardContent() {
           <CardContent>
             <div className="text-3xl font-bold text-white">{formatCurrency(totalIncome, currency)}</div>
             <p className="text-xs text-emerald-200/60 mt-1">This month</p>
-            <div className="flex items-center gap-1 mt-2 text-emerald-400 text-sm">
-              <ArrowUpCircle className="h-4 w-4" />
-              <span>+12%</span>
+            <div className={`flex items-center gap-1 mt-2 text-sm ${Number(incomeChange) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              <ArrowUpCircle className={`h-4 w-4 ${Number(incomeChange) < 0 ? 'rotate-180' : ''}`} />
+              <span>{Number(incomeChange) >= 0 ? '+' : ''}{incomeChange}%</span>
+              <span className="text-slate-400">vs last month</span>
             </div>
           </CardContent>
         </Card>
@@ -476,9 +492,10 @@ export default function DashboardContent() {
           <CardContent>
             <div className="text-3xl font-bold text-white">{formatCurrency(totalExpenses, currency)}</div>
             <p className="text-xs text-rose-200/60 mt-1">This month</p>
-            <div className="flex items-center gap-1 mt-2 text-rose-400 text-sm">
-              <ArrowDownCircle className="h-4 w-4" />
-              <span>-5%</span>
+            <div className={`flex items-center gap-1 mt-2 text-sm ${Number(spendingChange) >= 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+              <ArrowDownCircle className={`h-4 w-4 ${Number(spendingChange) < 0 ? 'rotate-180' : ''}`} />
+              <span>{Number(spendingChange) >= 0 ? '+' : ''}{spendingChange}%</span>
+              <span className="text-slate-400">vs last month</span>
             </div>
           </CardContent>
         </Card>
