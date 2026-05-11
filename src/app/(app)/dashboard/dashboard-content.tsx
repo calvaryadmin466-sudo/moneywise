@@ -421,17 +421,17 @@ export default function DashboardContent() {
         </DialogContent>
       </Dialog>
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="grid gap-4 grid-cols-1 min-w-0 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {/* Net Worth Card - Most Important */}
-        <Card className="glass-card relative overflow-hidden bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 border-violet-500/30">
+        <Card className="glass-card relative overflow-hidden bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 border-violet-500/30 min-w-0">
           <div className="absolute top-0 right-0 p-3 opacity-20">
             <TrendingUp className="h-12 w-12 text-violet-400" />
           </div>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-violet-400">Net Worth</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-white">{formatCurrency(netWorth, currency)}</div>
+          <CardContent className="p-4">
+            <div className="text-2xl sm:text-3xl font-bold text-white break-words">{formatCurrency(netWorth, currency)}</div>
             <p className="text-xs text-violet-200/60 mt-1">Total Assets Value</p>
             <div className="w-full bg-gray-700 h-1.5 rounded-full mt-3 overflow-hidden">
               <div 
@@ -442,15 +442,15 @@ export default function DashboardContent() {
           </CardContent>
         </Card>
 
-        <Card className="glass-card neon-blue relative overflow-hidden">
+        <Card className="glass-card neon-blue relative overflow-hidden min-w-0">
           <div className="absolute top-0 right-0 p-3 opacity-20">
             <Wallet className="h-12 w-12 text-cyan-400" />
           </div>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-cyan-400">Balance</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-white">{formatCurrency(balance, currency)}</div>
+          <CardContent className="p-4">
+            <div className="text-2xl sm:text-3xl font-bold text-white break-words">{formatCurrency(balance, currency)}</div>
             <p className="text-xs text-cyan-200/60 mt-1">This month</p>
             <svg className="w-full h-8 mt-3" viewBox="0 0 100 20">
               <polyline
@@ -464,15 +464,15 @@ export default function DashboardContent() {
           </CardContent>
         </Card>
 
-        <Card className="glass-card neon-green relative overflow-hidden">
+        <Card className="glass-card neon-green relative overflow-hidden min-w-0">
           <div className="absolute top-0 right-0 p-3 opacity-20">
             <ArrowUpCircle className="h-12 w-12 text-emerald-400" />
           </div>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-emerald-400">Income</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-white">{formatCurrency(totalIncome, currency)}</div>
+          <CardContent className="p-4">
+            <div className="text-2xl sm:text-3xl font-bold text-white break-words">{formatCurrency(totalIncome, currency)}</div>
             <p className="text-xs text-emerald-200/60 mt-1">This month</p>
             <div className={`flex items-center gap-1 mt-2 text-sm ${Number(incomeChange) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
               <ArrowUpCircle className={`h-4 w-4 ${Number(incomeChange) < 0 ? 'rotate-180' : ''}`} />
@@ -482,15 +482,15 @@ export default function DashboardContent() {
           </CardContent>
         </Card>
 
-        <Card className="glass-card neon-red relative overflow-hidden">
+        <Card className="glass-card neon-red relative overflow-hidden min-w-0">
           <div className="absolute top-0 right-0 p-3 opacity-20">
             <ArrowDownCircle className="h-12 w-12 text-rose-400" />
           </div>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-rose-400">Spent</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-white">{formatCurrency(totalExpenses, currency)}</div>
+          <CardContent className="p-4">
+            <div className="text-2xl sm:text-3xl font-bold text-white break-words">{formatCurrency(totalExpenses, currency)}</div>
             <p className="text-xs text-rose-200/60 mt-1">This month</p>
             <div className={`flex items-center gap-1 mt-2 text-sm ${Number(spendingChange) >= 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
               <ArrowDownCircle className={`h-4 w-4 ${Number(spendingChange) < 0 ? 'rotate-180' : ''}`} />
@@ -500,15 +500,15 @@ export default function DashboardContent() {
           </CardContent>
         </Card>
 
-        <Card className="glass-card neon-amber relative overflow-hidden">
+        <Card className="glass-card neon-amber relative overflow-hidden min-w-0">
           <div className="absolute top-0 right-0 p-3 opacity-20">
             <TrendingUp className="h-12 w-12 text-amber-400" />
           </div>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-amber-400">Budget Left</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-white">{formatCurrency(budgetLeft, currency)}</div>
+          <CardContent className="p-4">
+            <div className="text-2xl sm:text-3xl font-bold text-white break-words">{formatCurrency(budgetLeft, currency)}</div>
             <p className="text-xs text-amber-200/60 mt-1">
               {totalBudget > 0 ? ((budgetLeft / totalBudget) * 100).toFixed(0) : 0}% remaining
             </p>
