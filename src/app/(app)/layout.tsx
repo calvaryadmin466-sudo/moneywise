@@ -35,7 +35,7 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
 import { AddTransactionSheet } from "@/components/dashboard/add-transaction-sheet";
 import { SpendingInsightsDialog } from "@/components/dashboard/spending-insights-dialog";
-import { AIFinancialAdvisorV2 } from "@/components/dashboard/ai-financial-advisor-v2";
+import { AIFinancialAdvisorPro } from "@/components/dashboard/ai-financial-advisor-v2";
 import { MobileNav } from "@/components/mobile-nav";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase, getUser } from "@/lib/supabase";
@@ -221,7 +221,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <h1 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">{capitalizedTitle}</h1>
           </div>
           <div className="flex items-center gap-3">
-            <AIFinancialAdvisorV2 />
+            <AIFinancialAdvisorPro />
           </div>
         </header>
         {children}
