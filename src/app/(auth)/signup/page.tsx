@@ -47,6 +47,10 @@ export default function SignupPage() {
     try {
       const result = await signUp(email, password);
 
+      // Suppress email errors and always try to auto-login
+      const isEmailError = result.error?.message?.toLowerCase().includes('email') || 
+                           result.error?.message?.toLowerCase().includes('confirmation');
+
       // If user was created successfully, auto-login (even if email failed)
       if (result.user) {
         // Try to sign in immediately to get a session
@@ -57,34 +61,26 @@ export default function SignupPage() {
 
         if (!signInError) {
           toast({
-            title: "Success",
-            description: "Account created! Welcome to MoneyWise!",
+            title: "Welcome to MoneyWise!",
+            description: isEmailError ? "Account created successfully!" : "Account created! Welcome to MoneyWise!",
           });
           window.location.href = "/dashboard";
           return;
         }
       }
 
-      if (result.error) {
-        // Check if it's just an email error but user was created
-        if (result.error.message?.toLowerCase().includes('email') && result.user) {
-          toast({
-            title: "Account Created",
-            description: "Welcome to MoneyWise! (Email notification skipped)",
-          });
-          window.location.href = "/dashboard";
-          return;
-        }
-
+      // Only show error if it's not an email-related error
+      if (result.error && !isEmailError) {
         toast({
           title: "Error",
           description: result.error.message,
           variant: "destructive",
         });
-      } else {
+      } else if (result.user) {
+        // User created but login failed - still a success
         toast({
-          title: "Success",
-          description: "Account created! Please sign in.",
+          title: "Account Created",
+          description: "Please sign in with your credentials.",
         });
         window.location.href = "/login";
       }
