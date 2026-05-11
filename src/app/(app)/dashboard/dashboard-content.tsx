@@ -42,6 +42,7 @@ export default function DashboardContent() {
   const [transactions, setTransactions] = React.useState<Transaction[]>([]);
   const [budgets, setBudgets] = React.useState<Budget[]>([]);
   const [goals, setGoals] = React.useState<Goal[]>([]);
+  const [assets, setAssets] = React.useState<{ current_value: number; asset_type: string }[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [showCheckIn, setShowCheckIn] = React.useState(false);
   const [checkInAmount, setCheckInAmount] = React.useState("");
@@ -61,15 +62,17 @@ export default function DashboardContent() {
       setLoading(false);
       return;
     }
-    const [transRes, budgetRes, goalsRes] = await Promise.all([
+    const [transRes, budgetRes, goalsRes, assetsRes] = await Promise.all([
       supabase.from('transactions').select('id, user_id, type, amount, category, date, note, is_recurring, created_at').eq('user_id', userId).order('date', { ascending: false }),
       supabase.from('budgets').select('id, user_id, category, monthly_limit, month, created_at').eq('user_id', userId),
       supabase.from('goals').select('id, user_id, name, target_amount, saved_amount, deadline, created_at').eq('user_id', userId).order('created_at', { ascending: false }),
+      supabase.from('user_assets').select('current_value, asset_type').eq('user_id', userId),
     ]);
     
     if (transRes.data) setTransactions(transRes.data);
     if (budgetRes.data) setBudgets(budgetRes.data);
     if (goalsRes.data) setGoals(goalsRes.data);
+    if (assetsRes.data) setAssets(assetsRes.data || []);
     setLoading(false);
   }
 
@@ -105,7 +108,7 @@ export default function DashboardContent() {
     return transactions.filter(t => t.date === today);
   }, [transactions, today]);
 
-  const { totalIncome, totalExpenses, balance, lastMonthExpenses } = React.useMemo(() => {
+  const { totalIncome, totalExpenses, balance, lastMonthExpenses, netWorth } = React.useMemo(() => {
     const lastMonth = new Date();
     lastMonth.setMonth(lastMonth.getMonth() - 1);
     const lastMonthStr = lastMonth.toISOString().slice(0, 7);
@@ -122,13 +125,17 @@ export default function DashboardContent() {
       }
     });
     
+    // Calculate net worth from assets
+    const totalAssets = assets.reduce((sum, a) => sum + Number(a.current_value || 0), 0);
+    
     return { 
       totalIncome: income, 
       totalExpenses: expenses, 
       balance: income - expenses,
-      lastMonthExpenses: lastExp
+      lastMonthExpenses: lastExp,
+      netWorth: totalAssets
     };
-  }, [transactions, currentMonth]);
+  }, [transactions, currentMonth, assets]);
 
   const totalBudget = React.useMemo(() => {
     return budgets
@@ -399,7 +406,27 @@ export default function DashboardContent() {
         </DialogContent>
       </Dialog>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        {/* Net Worth Card - Most Important */}
+        <Card className="glass-card relative overflow-hidden bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 border-violet-500/30">
+          <div className="absolute top-0 right-0 p-3 opacity-20">
+            <TrendingUp className="h-12 w-12 text-violet-400" />
+          </div>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-violet-400">Net Worth</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-white">{formatCurrency(netWorth, currency)}</div>
+            <p className="text-xs text-violet-200/60 mt-1">Total Assets Value</p>
+            <div className="w-full bg-gray-700 h-1.5 rounded-full mt-3 overflow-hidden">
+              <div 
+                className="bg-gradient-to-r from-violet-400 to-fuchsia-400 h-full rounded-full transition-all"
+                style={{ width: `${Math.min((netWorth / 1000000) * 100, 100)}%` }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="glass-card neon-blue relative overflow-hidden">
           <div className="absolute top-0 right-0 p-3 opacity-20">
             <Wallet className="h-12 w-12 text-cyan-400" />
@@ -409,7 +436,7 @@ export default function DashboardContent() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-white">{formatCurrency(balance, currency)}</div>
-            <p className="text-xs text-cyan-200/60 mt-1">Total available</p>
+            <p className="text-xs text-cyan-200/60 mt-1">This month</p>
             <svg className="w-full h-8 mt-3" viewBox="0 0 100 20">
               <polyline
                 fill="none"
