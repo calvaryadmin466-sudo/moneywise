@@ -42,7 +42,7 @@ export default function DashboardContent() {
   const [transactions, setTransactions] = React.useState<Transaction[]>([]);
   const [budgets, setBudgets] = React.useState<Budget[]>([]);
   const [goals, setGoals] = React.useState<Goal[]>([]);
-  const [assets, setAssets] = React.useState<{ current_value: number; asset_type: string }[]>([]);
+  const [assets, setAssets] = React.useState<{ balance: number; asset_type: string }[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [showCheckIn, setShowCheckIn] = React.useState(false);
   const [checkInAmount, setCheckInAmount] = React.useState("");
@@ -66,7 +66,7 @@ export default function DashboardContent() {
       supabase.from('transactions').select('id, user_id, type, amount, category, date, note, is_recurring, created_at').eq('user_id', userId).order('date', { ascending: false }),
       supabase.from('budgets').select('id, user_id, category, monthly_limit, month, created_at').eq('user_id', userId),
       supabase.from('goals').select('id, user_id, name, target_amount, saved_amount, deadline, created_at').eq('user_id', userId).order('created_at', { ascending: false }),
-      supabase.from('user_assets').select('current_value, asset_type').eq('user_id', userId),
+      supabase.from('user_assets').select('balance, asset_type').eq('user_id', userId),
     ]);
     
     if (transRes.data) setTransactions(transRes.data);
@@ -126,7 +126,7 @@ export default function DashboardContent() {
     });
     
     // Calculate net worth from assets
-    const totalAssets = assets.reduce((sum, a) => sum + Number(a.current_value || 0), 0);
+    const totalAssets = assets.reduce((sum, a) => sum + Number(a.balance || 0), 0);
     
     return { 
       totalIncome: income, 
