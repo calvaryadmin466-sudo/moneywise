@@ -237,7 +237,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </SidebarFooter>
       </Sidebar>
 
-      <SidebarInset className="bg-transparent">
+      <SidebarInset className="bg-transparent overflow-auto min-h-screen">
          <header className="flex items-center justify-between border-b border-white/10 bg-[#0f172a]/50 backdrop-blur-xl p-4 sm:p-6">
           <div className="flex items-center gap-4">
              <SidebarTrigger className="md:hidden text-gray-400" />
