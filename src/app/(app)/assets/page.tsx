@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase, getUser } from "@/lib/supabase";
+import { AssetType, AssetTypeConfig } from "@/lib/types";
 import { 
   Wallet, 
   Building2, 
@@ -20,30 +21,60 @@ import {
   Save,
   ArrowDownLeft,
   ArrowUpRight,
-  PiggyBank
+  PiggyBank,
+  FileText,
+  Home,
+  Car,
+  CircleDot,
+  Briefcase,
+  PawPrint,
+  Leaf,
+  Box
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 
 interface Asset {
   id: string;
-  type: 'cash' | 'bank' | 'mobile_money' | 'stocks' | 'other';
+  asset_type: AssetType;
   name: string;
-  balance: number;
+  current_value: number;
+  purchase_value?: number;
   currency: string;
   account_number?: string;
   bank_name?: string;
   broker_name?: string;
   description?: string;
+  icon_name?: string;
+  color_hex?: string;
 }
 
-const ASSET_TYPES = [
-  { value: 'cash', label: 'Cash on Hand', icon: Banknote, color: 'text-green-400', bgColor: 'bg-green-500/20' },
-  { value: 'mobile_money', label: 'Mobile Money', icon: Smartphone, color: 'text-blue-400', bgColor: 'bg-blue-500/20' },
-  { value: 'bank', label: 'Bank Account', icon: Building2, color: 'text-purple-400', bgColor: 'bg-purple-500/20' },
-  { value: 'stocks', label: 'Stocks/Investments', icon: TrendingUp, color: 'text-amber-400', bgColor: 'bg-amber-500/20' },
-  { value: 'other', label: 'Other', icon: PiggyBank, color: 'text-gray-400', bgColor: 'bg-gray-500/20' },
-];
+// Icon mapping for dynamic rendering
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  Banknote,
+  Building2,
+  Smartphone,
+  TrendingUp,
+  FileText,
+  Home,
+  Car,
+  CircleDot,
+  Briefcase,
+  PawPrint,
+  Leaf,
+  Box,
+  PiggyBank,
+  Wallet
+};
+
+const ASSET_TYPES = Object.entries(AssetTypeConfig).map(([key, config]) => ({
+  value: key as AssetType,
+  label: config.label,
+  icon: ICON_MAP[config.icon] || Box,
+  color: `text-[${config.color}]`,
+  bgColor: `bg-[${config.color}]/20`,
+  hexColor: config.color
+}));
 
 export default function AssetsPage() {
   const { toast } = useToast();
@@ -56,9 +87,10 @@ export default function AssetsPage() {
   const [updateAmount, setUpdateAmount] = React.useState('');
   const [updateType, setUpdateType] = React.useState<'add' | 'subtract'>('add');
   const [newAsset, setNewAsset] = React.useState({
-    type: 'cash' as Asset['type'],
+    asset_type: AssetType.CASH,
     name: '',
-    balance: '',
+    current_value: '',
+    purchase_value: '',
     currency: 'TZS',
     account_number: '',
     bank_name: '',

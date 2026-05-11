@@ -49,25 +49,39 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [transactions, setTransactions] = React.useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
 
-  // Check auth on mount
+  // Check auth on mount and listen for auth state changes
   React.useEffect(() => {
+    let mounted = true;
+    
     async function checkAuth() {
-      const user = await getUser();
+      const { data: { session } } = await supabase.auth.getSession();
       
-      if (!user) {
+      if (!session?.user) {
         router.push('/login');
-      } else {
+      } else if (mounted) {
         setIsLoading(false);
       }
     }
     checkAuth();
+    
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
+        router.push('/login');
+      }
+    });
+    
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [router]);
 
   // Fetch transactions for insights dialog
   React.useEffect(() => {
     async function fetchTransactions() {
-      const user = await getUser();
-      const userId = user?.id;
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id;
       if (!userId) return;
       
       const { data } = await supabase

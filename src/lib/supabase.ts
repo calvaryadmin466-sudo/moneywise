@@ -20,6 +20,22 @@ export async function signOut() {
   return await supabase.auth.signOut()
 }
 
+export async function signIn(email: string, password: string) {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
+  return { user: data.user, session: data.session, error }
+}
+
+export async function signUp(email: string, password: string) {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+  })
+  return { user: data.user, session: data.session, error }
+}
+
 // Data fetching helpers
 export async function getTransactions(userId: string) {
   const { data, error } = await supabase
