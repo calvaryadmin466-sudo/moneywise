@@ -128,10 +128,14 @@ export default function GoalsContent() {
               <div className="space-y-2">
                 <Label>Target Amount</Label>
                 <Input
-                  type="number"
+                  type="text"
                   value={formData.target_amount}
-                  onChange={(e) => setFormData({ ...formData, target_amount: e.target.value })}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9.]/g, '');
+                    setFormData({ ...formData, target_amount: value });
+                  }}
                   placeholder="0.00"
+                  className="text-lg"
                 />
               </div>
               <div className="space-y-2">
@@ -232,10 +236,14 @@ export default function GoalsContent() {
             <div className="space-y-2">
               <Label>Amount to Add</Label>
               <Input
-                type="number"
+                type="text"
                 value={contributeAmount}
-                onChange={(e) => setContributeAmount(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9.]/g, '');
+                  setContributeAmount(value);
+                }}
                 placeholder="0.00"
+                className="text-lg"
               />
             </div>
             <div className="flex justify-between text-sm text-muted-foreground">

@@ -347,11 +347,14 @@ export default function AssetsPage() {
                   <div className="space-y-2">
                     <Label>Current Balance</Label>
                     <Input
-                      type="number"
+                      type="text"
                       value={newAsset.balance}
-                      onChange={(e) => setNewAsset({ ...newAsset, balance: e.target.value })}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^0-9.]/g, '');
+                        setNewAsset({ ...newAsset, balance: value });
+                      }}
                       placeholder="0.00"
-                      className="bg-[#0f172a] border-white/20 text-white"
+                      className="bg-[#0f172a] border-white/20 text-white text-lg"
                     />
                   </div>
                   <div className="space-y-2">
@@ -527,9 +530,12 @@ export default function AssetsPage() {
               <div className="space-y-2">
                 <Label>Amount to {updateType === 'add' ? 'Add' : 'Use'}</Label>
                 <Input
-                  type="number"
+                  type="text"
                   value={updateAmount}
-                  onChange={(e) => setUpdateAmount(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9.]/g, '');
+                    setUpdateAmount(value);
+                  }}
                   placeholder="0.00"
                   className="bg-[#0f172a] border-white/20 text-white text-lg"
                   autoFocus

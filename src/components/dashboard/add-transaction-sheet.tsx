@@ -167,7 +167,16 @@ export function AddTransactionSheet({
                 <FormItem>
                   <FormLabel>Amount</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="0.00" {...field} />
+                    <Input 
+                      type="text" 
+                      placeholder="0.00" 
+                      {...field}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^0-9.]/g, '');
+                        field.onChange(value ? parseFloat(value) : 0);
+                      }}
+                      className="text-lg"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

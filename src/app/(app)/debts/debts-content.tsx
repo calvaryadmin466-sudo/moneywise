@@ -174,10 +174,14 @@ export default function DebtsContent() {
               <div className="space-y-2">
                 <Label>Amount</Label>
                 <Input
-                  type="number"
+                  type="text"
                   value={formData.amount}
-                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9.]/g, '');
+                    setFormData({ ...formData, amount: value });
+                  }}
                   placeholder="0.00"
+                  className="text-lg"
                 />
               </div>
               <div className="space-y-2">

@@ -141,10 +141,14 @@ export default function BudgetsContent() {
               <div className="space-y-2">
                 <Label>Monthly Limit</Label>
                 <Input
-                  type="number"
+                  type="text"
                   value={formData.monthly_limit}
-                  onChange={(e) => setFormData({ ...formData, monthly_limit: e.target.value })}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9.]/g, '');
+                    setFormData({ ...formData, monthly_limit: value });
+                  }}
                   placeholder="0.00"
+                  className="text-lg"
                 />
               </div>
               <div className="space-y-2">
