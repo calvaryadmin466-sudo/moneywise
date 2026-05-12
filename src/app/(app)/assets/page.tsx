@@ -354,7 +354,8 @@ export default function AssetsPage() {
                         setNewAsset({ ...newAsset, balance: value });
                       }}
                       placeholder="0.00"
-                      className="bg-[#0f172a] border-white/20 text-white text-lg"
+                      className="bg-[#0f172a] border-white/20 text-white text-lg min-w-[200px]"
+                      style={{ fontSize: '1.125rem', padding: '0.75rem' }}
                     />
                   </div>
                   <div className="space-y-2">
@@ -537,7 +538,8 @@ export default function AssetsPage() {
                     setUpdateAmount(value);
                   }}
                   placeholder="0.00"
-                  className="bg-[#0f172a] border-white/20 text-white text-lg"
+                  className="bg-[#0f172a] border-white/20 text-white text-lg min-w-[200px]"
+                  style={{ fontSize: '1.125rem', padding: '0.75rem' }}
                   autoFocus
                 />
               </div>
