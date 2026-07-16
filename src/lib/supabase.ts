@@ -135,7 +135,7 @@ export type Debt = {
 export type Asset = {
   id: string
   user_id: string
-  type: 'cash' | 'bank' | 'mobile_money' | 'stocks' | 'real_estate' | 'other'
+  type: 'cash' | 'bank_account' | 'mobile_money' | 'stocks' | 'bonds' | 'real_estate' | 'vehicle' | 'jewelry' | 'business' | 'livestock' | 'land' | 'other'
   name: string
   balance: number
   currency: string

@@ -36,17 +36,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 
 interface Asset {
   id: string;
-  asset_type: AssetType;
+  type: AssetType;
   name: string;
-  current_value: number;
-  purchase_value?: number;
+  balance: number;
   currency: string;
   account_number?: string;
   bank_name?: string;
   broker_name?: string;
   description?: string;
-  icon_name?: string;
-  color_hex?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // Icon mapping for dynamic rendering
@@ -87,10 +86,9 @@ export default function AssetsPage() {
   const [updateAmount, setUpdateAmount] = React.useState('');
   const [updateType, setUpdateType] = React.useState<'add' | 'subtract'>('add');
   const [newAsset, setNewAsset] = React.useState({
-    asset_type: AssetType.CASH,
+    type: AssetType.CASH,
     name: '',
-    current_value: '',
-    purchase_value: '',
+    balance: '',
     currency: 'TZS',
     account_number: '',
     bank_name: '',
@@ -160,7 +158,7 @@ export default function AssetsPage() {
       });
       setShowAddDialog(false);
       setNewAsset({
-        type: 'cash',
+        type: AssetType.CASH,
         name: '',
         balance: '',
         currency: 'TZS',
@@ -302,12 +300,12 @@ export default function AssetsPage() {
                   <Input
                     value={newAsset.name}
                     onChange={(e) => setNewAsset({ ...newAsset, name: e.target.value })}
-                    placeholder={newAsset.type === 'cash' ? 'Cash in Wallet' : newAsset.type === 'bank' ? 'CRDB Bank' : 'M-Pesa'}
+                    placeholder={newAsset.type === AssetType.CASH ? 'Cash in Wallet' : newAsset.type === AssetType.BANK_ACCOUNT ? 'CRDB Bank' : 'M-Pesa'}
                     className="bg-[#0f172a] border-white/20 text-white"
                   />
                 </div>
 
-                {newAsset.type === 'bank' && (
+                {newAsset.type === AssetType.BANK_ACCOUNT && (
                   <div className="space-y-2">
                     <Label>Bank Name</Label>
                     <Input
@@ -319,19 +317,19 @@ export default function AssetsPage() {
                   </div>
                 )}
 
-                {(newAsset.type === 'bank' || newAsset.type === 'mobile_money') && (
+                {(newAsset.type === AssetType.BANK_ACCOUNT || newAsset.type === AssetType.MOBILE_MONEY) && (
                   <div className="space-y-2">
                     <Label>Account/Phone Number</Label>
                     <Input
                       value={newAsset.account_number}
                       onChange={(e) => setNewAsset({ ...newAsset, account_number: e.target.value })}
-                      placeholder={newAsset.type === 'mobile_money' ? '07XX XXX XXX' : 'Account number'}
+                      placeholder={newAsset.type === AssetType.MOBILE_MONEY ? '07XX XXX XXX' : 'Account number'}
                       className="bg-[#0f172a] border-white/20 text-white"
                     />
                   </div>
                 )}
 
-                {newAsset.type === 'stocks' && (
+                {newAsset.type === AssetType.STOCKS && (
                   <div className="space-y-2">
                     <Label>Broker/Platform</Label>
                     <Input
