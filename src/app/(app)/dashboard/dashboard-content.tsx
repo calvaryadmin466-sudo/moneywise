@@ -69,7 +69,7 @@ export default function DashboardContent() {
         return;
       }
       const [transRes, budgetRes, goalsRes, assetsRes] = await Promise.all([
-        supabase.from('transactions').select('id, user_id, type, amount, category, date, note, is_recurring, asset_id, income_source, created_at').eq('user_id', userId).order('date', { ascending: false }),
+        supabase.from('transactions').select('id, user_id, type, amount, category, date, note, is_recurring, created_at').eq('user_id', userId).order('date', { ascending: false }),
         supabase.from('budgets').select('id, user_id, category, monthly_limit, month, created_at').eq('user_id', userId),
         supabase.from('goals').select('id, user_id, name, target_amount, saved_amount, deadline, created_at').eq('user_id', userId).order('created_at', { ascending: false }),
         supabase.from('user_assets').select('id, name, type, balance, currency').eq('user_id', userId),

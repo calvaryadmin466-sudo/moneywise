@@ -50,7 +50,7 @@ export default function ReportsContent() {
     const [transRes, assetsRes] = await Promise.all([
       supabase
         .from('transactions')
-        .select('id, user_id, type, amount, category, date, note, is_recurring, asset_id, income_source, created_at')
+        .select('id, user_id, type, amount, category, date, note, is_recurring, created_at')
         .eq('user_id', userId)
         .order('date', { ascending: false }),
       supabase.from('user_assets').select('id, name, type, balance, currency').eq('user_id', userId),
@@ -101,8 +101,7 @@ export default function ReportsContent() {
     filteredTransactions
       .filter(t => t.type === "income")
       .forEach(t => {
-        const source = t.income_source || "Other";
-        map[source] = (map[source] || 0) + Number(t.amount);
+        map["Income"] = (map["Income"] || 0) + Number(t.amount);
       });
     return map;
   }, [filteredTransactions]);
@@ -111,12 +110,11 @@ export default function ReportsContent() {
     const map: Record<string, number> = {};
     filteredTransactions
       .filter(t => t.type === "income")
-      .forEach(t => {
-        const assetName = t.asset_id ? (assets.find(asset => asset.id === t.asset_id)?.name || "Linked Asset") : "No asset";
-        map[assetName] = (map[assetName] || 0) + Number(t.amount);
+      .forEach(() => {
+        map["No linked asset"] = (map["No linked asset"] || 0) + 0;
       });
     return map;
-  }, [filteredTransactions, assets]);
+  }, [filteredTransactions]);
 
   const monthlyTrend = React.useMemo(() => {
     const months: Record<string, { income: number; expense: number }> = {};
