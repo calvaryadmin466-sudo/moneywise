@@ -57,24 +57,42 @@ export default function DashboardContent() {
 
   async function fetchData() {
     setLoading(true);
-    const user = await getUser();
-    const userId = user?.id;
-    if (!userId) {
-      setLoading(false);
-      return;
-    }
-    const [transRes, budgetRes, goalsRes, assetsRes] = await Promise.all([
-      supabase.from('transactions').select('id, user_id, type, amount, category, date, note, is_recurring, asset_id, income_source, created_at').eq('user_id', userId).order('date', { ascending: false }),
-      supabase.from('budgets').select('id, user_id, category, monthly_limit, month, created_at').eq('user_id', userId),
-      supabase.from('goals').select('id, user_id, name, target_amount, saved_amount, deadline, created_at').eq('user_id', userId).order('created_at', { ascending: false }),
-      supabase.from('user_assets').select('id, name, type, balance, currency').eq('user_id', userId),
-    ]);
+    try {
+      const user = await getUser();
+      const userId = user?.id;
+      if (!userId) {
+        setTransactions([]);
+        setBudgets([]);
+        setGoals([]);
+        setAssets([]);
+        setLoading(false);
+        return;
+      }
+      const [transRes, budgetRes, goalsRes, assetsRes] = await Promise.all([
+        supabase.from('transactions').select('id, user_id, type, amount, category, date, note, is_recurring, asset_id, income_source, created_at').eq('user_id', userId).order('date', { ascending: false }),
+        supabase.from('budgets').select('id, user_id, category, monthly_limit, month, created_at').eq('user_id', userId),
+        supabase.from('goals').select('id, user_id, name, target_amount, saved_amount, deadline, created_at').eq('user_id', userId).order('created_at', { ascending: false }),
+        supabase.from('user_assets').select('id, name, type, balance, currency').eq('user_id', userId),
+      ]);
 
-    if (transRes.data) setTransactions(transRes.data);
-    if (budgetRes.data) setBudgets(budgetRes.data);
-    if (goalsRes.data) setGoals(goalsRes.data);
-    if (assetsRes.data) setAssets(assetsRes.data || []);
-    setLoading(false);
+      if (transRes.error) throw transRes.error;
+      if (budgetRes.error) throw budgetRes.error;
+      if (goalsRes.error) throw goalsRes.error;
+      if (assetsRes.error) throw assetsRes.error;
+
+      setTransactions(transRes.data || []);
+      setBudgets(budgetRes.data || []);
+      setGoals(goalsRes.data || []);
+      setAssets(assetsRes.data || []);
+    } catch (error) {
+      console.error('Dashboard fetch error:', error);
+      setTransactions([]);
+      setBudgets([]);
+      setGoals([]);
+      setAssets([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function addCheckInTransaction() {

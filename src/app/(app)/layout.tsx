@@ -132,24 +132,45 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     let mounted = true;
 
     async function checkAuth() {
-      const { data: { session } } = await supabase.auth.getSession();
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
 
-      if (!session?.user) {
-        router.push('/login');
-      } else if (mounted) {
-        setIsLoading(false);
-        // Fetch user profile data
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('full_name, avatar_url')
-          .eq('id', session.user.id)
-          .single();
+        if (!session?.user) {
+          if (mounted) {
+            setIsLoading(false);
+            setUserData(null);
+          }
+          router.push('/login');
+          return;
+        }
 
-        setUserData({
-          name: profile?.full_name || session.user.email?.split('@')[0] || 'User',
-          email: session.user.email || '',
-          avatar_url: profile?.avatar_url,
-        });
+        if (mounted) {
+          setIsLoading(false);
+          try {
+            const { data: profile } = await supabase
+              .from('user_profiles')
+              .select('full_name, avatar_url')
+              .eq('id', session.user.id)
+              .single();
+
+            setUserData({
+              name: profile?.full_name || session.user.email?.split('@')[0] || 'User',
+              email: session.user.email || '',
+              avatar_url: profile?.avatar_url,
+            });
+          } catch {
+            setUserData({
+              name: session.user.email?.split('@')[0] || 'User',
+              email: session.user.email || '',
+              avatar_url: undefined,
+            });
+          }
+        }
+      } catch {
+        if (mounted) {
+          setIsLoading(false);
+          setUserData(null);
+        }
       }
     }
     checkAuth();
