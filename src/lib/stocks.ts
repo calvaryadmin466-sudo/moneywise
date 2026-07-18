@@ -32,9 +32,9 @@ export async function fetchStockQuote(symbol: string): Promise<StockData | null>
     const response = await fetch(
       `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${ALPHA_VANTAGE_API_KEY}`
     );
-    
+
     const data = await response.json();
-    
+
     if (data['Global Quote']) {
       const quote = data['Global Quote'];
       return {
@@ -47,7 +47,7 @@ export async function fetchStockQuote(symbol: string): Promise<StockData | null>
         lastUpdated: quote['07. latest trading day'],
       };
     }
-    
+
     // If API limit reached or error, return mock data for demo
     return getMockStockData(symbol);
   } catch (error) {
@@ -64,7 +64,7 @@ const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
 export async function fetchMultipleStocks(symbols: string[]): Promise<StockData[]> {
   const results: StockData[] = [];
   const now = Date.now();
-  
+
   for (const symbol of symbols.slice(0, 5)) {
     // Check cache first
     const cached = stockCache.get(symbol);
@@ -72,7 +72,7 @@ export async function fetchMultipleStocks(symbols: string[]): Promise<StockData[
       results.push(cached.data);
       continue;
     }
-    
+
     // Fetch fresh data
     const data = await fetchStockQuote(symbol);
     if (data) {
@@ -83,25 +83,25 @@ export async function fetchMultipleStocks(symbols: string[]): Promise<StockData[
         data.change = data.change + (data.price * variation / 100);
         data.changePercent = data.changePercent + variation;
       }
-      
+
       stockCache.set(symbol, { data, timestamp: now });
       results.push(data);
     }
-    
+
     // Add small delay to respect rate limits
     await new Promise(resolve => setTimeout(resolve, 200));
   }
-  
+
   return results;
 }
 
 // Get last updated time for display
 export function getLastUpdatedTime(): string {
   const now = new Date();
-  return now.toLocaleTimeString('en-US', { 
-    hour: '2-digit', 
+  return now.toLocaleTimeString('en-US', {
+    hour: '2-digit',
     minute: '2-digit',
-    hour12: true 
+    hour12: true
   });
 }
 
@@ -109,10 +109,10 @@ export function getLastUpdatedTime(): string {
 export async function getStocksForCountry(countryCode: string): Promise<StockData[]> {
   const normalizedCode = countryCode?.toUpperCase() || 'US';
   console.log('Fetching stocks for country:', normalizedCode);
-  
+
   const symbols = REGIONAL_STOCKS[normalizedCode as keyof typeof REGIONAL_STOCKS] || REGIONAL_STOCKS.TZ;
   console.log('Stock symbols:', symbols);
-  
+
   return fetchMultipleStocks(symbols);
 }
 
@@ -127,7 +127,7 @@ function getMockStockData(symbol: string): StockData {
     'TSLA': { name: 'Tesla Inc', price: 245.60, change: -5.40, changePercent: -2.15, sector: 'Automotive' },
     'NVDA': { name: 'NVIDIA Corp', price: 495.80, change: 12.30, changePercent: 2.55, sector: 'Technology' },
     'META': { name: 'Meta Platforms', price: 505.20, change: 8.10, changePercent: 1.63, sector: 'Technology' },
-    
+
     // DSE (Tanzania) - Dar es Salaam Stock Exchange - Real-time May 2, 2026 from AfricanFinancials.com
     'NMB': { name: 'NMB Bank Plc', price: 13510, change: 9.46, changePercent: 0.07, sector: 'Banking', currency: 'TZS' },
     'CRDB': { name: 'CRDB Bank Plc', price: 2830, change: 0, changePercent: 0.00, sector: 'Banking', currency: 'TZS' },
@@ -150,42 +150,42 @@ function getMockStockData(symbol: string): StockData {
     'KA': { name: 'Kenya Airways', price: 130, change: 0, changePercent: 0.00, sector: 'Transport', currency: 'TZS' },
     'MWAL': { name: 'Mwanga Hakika', price: 430, change: 8, changePercent: 1.90, sector: 'Telecom', currency: 'TZS' },
     'MAENDELEO': { name: 'Maendeleo Bank', price: 350, change: -8, changePercent: -2.23, sector: 'Banking', currency: 'TZS' },
-    
+
     // NSE (Kenya) - Nairobi Securities Exchange
     'SCOM': { name: 'Safaricom PLC', price: 17.50, change: 0.54, changePercent: 3.18, sector: 'Telecom', currency: 'KES' },
     'EQTY': { name: 'Equity Group Holdings', price: 48.20, change: 2.34, changePercent: 5.11, sector: 'Banking', currency: 'KES' },
-    'KCB': { name: 'KCB Group', price: 38.50, change: 1.20, changePercent: 3.21, sector: 'Banking', currency: 'KES' },
+    'KCB2': { name: 'KCB Group', price: 38.50, change: 1.20, changePercent: 3.21, sector: 'Banking', currency: 'KES' },
     'COOP': { name: 'Co-operative Bank', price: 18.80, change: 0.45, changePercent: 2.45, sector: 'Banking', currency: 'KES' },
     'EABL': { name: 'East African Breweries', price: 142, change: 3.50, changePercent: 2.53, sector: 'Consumer', currency: 'KES' },
-    
+
     // NGX (Nigeria) - Nigerian Exchange Group
     'GTCO': { name: 'Guaranty Trust Holding', price: 42.50, change: 1.55, changePercent: 3.79, sector: 'Banking', currency: 'NGN' },
     'ZENITHBANK': { name: 'Zenith Bank Plc', price: 38.20, change: 1.08, changePercent: 2.91, sector: 'Banking', currency: 'NGN' },
     'DANGCEM': { name: 'Dangote Cement', price: 7200, change: 150, changePercent: 2.13, sector: 'Manufacturing', currency: 'NGN' },
     'MTNN': { name: 'MTN Nigeria', price: 260, change: 8.50, changePercent: 3.38, sector: 'Telecom', currency: 'NGN' },
     'BUACEMENT': { name: 'BUA Cement', price: 98.50, change: 3.20, changePercent: 3.35, sector: 'Manufacturing', currency: 'NGN' },
-    
+
     // USE (Uganda) - Uganda Securities Exchange
     'SBU': { name: 'Stanbic Bank Uganda', price: 26.50, change: 0.75, changePercent: 2.91, sector: 'Banking', currency: 'UGX' },
     'UMEM': { name: 'Umeme Ltd', price: 270, change: 5, changePercent: 1.89, sector: 'Utilities', currency: 'UGX' },
     'NVL': { name: 'New Vision Group', price: 220, change: -3, changePercent: -1.35, sector: 'Media', currency: 'UGX' },
     'BATU': { name: 'BAT Uganda', price: 17500, change: 200, changePercent: 1.16, sector: 'Consumer', currency: 'UGX' },
-    
+
     // JSE (South Africa) - Johannesburg Stock Exchange
     'SHP': { name: 'Shoprite Holdings', price: 248.50, change: 4.20, changePercent: 1.72, sector: 'Retail', currency: 'ZAR' },
     'FSR': { name: 'FirstRand Limited', price: 68.20, change: 1.80, changePercent: 2.71, sector: 'Banking', currency: 'ZAR' },
     'ABG': { name: 'ABSA Group', price: 172.40, change: 3.50, changePercent: 2.07, sector: 'Banking', currency: 'ZAR' },
     'MTN': { name: 'MTN Group', price: 125.80, change: 2.30, changePercent: 1.86, sector: 'Telecom', currency: 'ZAR' },
   };
-  
-  const mock = mockDatabase[symbol] || { 
-    name: symbol, 
-    price: Math.random() * 200 + 50, 
+
+  const mock = mockDatabase[symbol] || {
+    name: symbol,
+    price: Math.random() * 200 + 50,
     change: (Math.random() - 0.5) * 10,
     changePercent: (Math.random() - 0.5) * 5,
     sector: 'Unknown'
   };
-  
+
   return {
     symbol,
     name: mock.name || symbol,
@@ -203,11 +203,11 @@ export function getMarketStatus(): { isOpen: boolean; nextOpen: string; nextClos
   const now = new Date();
   const day = now.getDay();
   const hour = now.getHours();
-  
+
   // Simple check - markets generally open 9:30 AM - 4:00 PM EST on weekdays
   const isWeekday = day >= 1 && day <= 5;
   const isMarketHours = hour >= 9 && hour < 16; // Simplified
-  
+
   return {
     isOpen: isWeekday && isMarketHours,
     nextOpen: isWeekday && !isMarketHours && hour < 9 ? 'Today 9:30 AM' : 'Tomorrow 9:30 AM',

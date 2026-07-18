@@ -42,9 +42,9 @@ export function AIFinancialAdvisor() {
       gqlRequest(`query { goals(where: {user_id: {_eq: "${userId}"}}) { id name target_amount saved_amount deadline } }`),
     ]);
 
-    if (transRes.data?.transactions) setTransactions(transRes.data.transactions);
-    if (budgetRes.data?.budgets) setBudgets(budgetRes.data.budgets);
-    if (goalsRes.data?.goals) setGoals(goalsRes.data.goals);
+    if (transRes.data && Array.isArray((transRes.data as any).transactions)) setTransactions((transRes.data as any).transactions);
+    if (budgetRes.data && Array.isArray((budgetRes.data as any).budgets)) setBudgets((budgetRes.data as any).budgets);
+    if (goalsRes.data && Array.isArray((goalsRes.data as any).goals)) setGoals((goalsRes.data as any).goals);
     setDataLoaded(true);
   }
 
@@ -79,7 +79,7 @@ Provide practical, actionable financial advice based on this data. Keep response
 
   async function sendMessage() {
     if (!input.trim()) return;
-    
+
     const userMessage = input;
     setInput("");
     setMessages(prev => [...prev, { role: "user", content: userMessage }]);
@@ -108,7 +108,7 @@ Provide practical, actionable financial advice based on this data. Keep response
 
       const data = await response.json();
       const assistantMessage = data.choices?.[0]?.message?.content || "Sorry, I couldn't generate a response. Please try again.";
-      
+
       setMessages(prev => [...prev, { role: "assistant", content: assistantMessage }]);
     } catch (error) {
       console.error("AI Error:", error);
@@ -133,15 +133,14 @@ Provide practical, actionable financial advice based on this data. Keep response
             AI Financial Advisor
           </DialogTitle>
         </DialogHeader>
-        
+
         <div className="flex-1 overflow-y-auto space-y-4 p-4">
           {messages.map((msg, i) => (
             <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[80%] rounded-lg p-3 ${
-                msg.role === "user" 
-                  ? "bg-violet-600 text-white" 
+              <div className={`max-w-[80%] rounded-lg p-3 ${msg.role === "user"
+                  ? "bg-violet-600 text-white"
                   : "bg-muted text-foreground"
-              }`}>
+                }`}>
                 <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
               </div>
             </div>

@@ -115,6 +115,7 @@ interface FinancialHealth {
   grade: "A" | "B" | "C" | "D" | "F";
   insights: string[];
   recommendations: string[];
+  riskTolerance?: "low" | "moderate" | "high";
 }
 
 interface ChartDataPoint {
@@ -939,8 +940,8 @@ export function AIFinancialAdvisorPro() {
         category: category.charAt(0).toUpperCase() + category.slice(1),
         amount,
         percentage: totalExpenses > 0 ? (amount / totalExpenses) * 100 : 0,
-        trend: Math.random() > 0.5 ? "up" : Math.random() > 0.5 ? "down" : "stable",
-        trendPercentage: (Math.random() - 0.3) * 20,
+        trend: (Math.random() > 0.66 ? "up" : Math.random() > 0.33 ? "down" : "stable") as SpendingCategory["trend"],
+        trendPercentage: Number(((Math.random() - 0.3) * 20).toFixed(1)),
         icon: categoryIcons[category] || <DollarSign className="h-4 w-4" />,
         color: categoryColors[i % categoryColors.length],
       }))
@@ -1227,11 +1228,11 @@ Would you like a detailed analysis of any specific stock?`,
 
 **Savings Goals:**
 ${goals.slice(0, 3).map(g => {
-  const remaining = Number(g.target_amount) - Number(g.saved_amount);
-  const monthsLeft = remaining / monthlySavings;
-  return `• ${g.name}: ${formatCurrency(Number(g.saved_amount))} / ${formatCurrency(Number(g.target_amount))}
+        const remaining = Number(g.target_amount) - Number(g.saved_amount);
+        const monthsLeft = remaining / monthlySavings;
+        return `• ${g.name}: ${formatCurrency(Number(g.saved_amount))} / ${formatCurrency(Number(g.target_amount))}
   ${monthsLeft > 0 ? `  Estimated completion: ${monthsLeft.toFixed(1)} months` : "  ✅ Goal reached!"}`;
-}).join('\n') || "No savings goals set. Consider creating one!"}
+      }).join('\n') || "No savings goals set. Consider creating one!"}
 
 **Tips to Boost Savings:**
 1. Automate transfers on payday
@@ -1262,7 +1263,7 @@ Want help creating a savings plan?`,
 
 **Spending by Category:**
 ${spendingCategories.slice(0, 5).map(c => `• ${c.category}: ${formatCurrency(c.amount)} (${c.percentage.toFixed(1)}%)
-  ${c.trend === "up" ? "📈 "+ c.trendPercentage.toFixed(1) + "% vs last month" : c.trend === "down" ? "📉 " + c.trendPercentage.toFixed(1) + "% vs last month" : "➡️ Stable"}`).join('\n')}
+  ${c.trend === "up" ? "📈 " + c.trendPercentage.toFixed(1) + "% vs last month" : c.trend === "down" ? "📉 " + c.trendPercentage.toFixed(1) + "% vs last month" : "➡️ Stable"}`).join('\n')}
 
 **Recommended 50/30/20 Budget:**
 • Needs (50%): ${formatCurrency(totalIncome * 0.5)} - Housing, food, transport
@@ -1397,12 +1398,12 @@ Want help creating a debt payoff plan?`,
       content: `🎯 **Financial Goals Status**
 
 ${goals.length > 0 ? goals.map(g => {
-  const remaining = Number(g.target_amount) - Number(g.saved_amount);
-  const progress = (Number(g.saved_amount) / Number(g.target_amount)) * 100;
-  const daysLeft = Math.ceil((new Date(g.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-  const monthlyRequired = remaining / Math.max(1, daysLeft / 30);
+        const remaining = Number(g.target_amount) - Number(g.saved_amount);
+        const progress = (Number(g.saved_amount) / Number(g.target_amount)) * 100;
+        const daysLeft = g.deadline ? Math.ceil((new Date(g.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0;
+        const monthlyRequired = remaining / Math.max(1, daysLeft / 30);
 
-  return `**${g.name}**
+        return `**${g.name}**
 • Progress: ${progress.toFixed(1)}%
 • Saved: ${formatCurrency(Number(g.saved_amount))} / ${formatCurrency(Number(g.target_amount))}
 • Remaining: ${formatCurrency(remaining)}
@@ -1410,7 +1411,7 @@ ${goals.length > 0 ? goals.map(g => {
 • Monthly required: ${formatCurrency(monthlyRequired)}
 • Status: ${progress >= 50 ? "✅ On Track" : progress >= 25 ? "⚠️ At Risk" : "❌ Behind"}
 `;
-}).join('\n') : "No savings goals yet. Let's create one!"}
+      }).join('\n') : "No savings goals yet. Let's create one!"}
 
 **Quick Goal Ideas:**
 • Emergency Fund (3-6 months expenses)
@@ -1938,16 +1939,16 @@ Just ask me any of these questions or type your specific concern!`,
                       <Badge className={cn(
                         "text-xs",
                         rec.recommendation === "strong_buy" ? "bg-emerald-500/20 text-emerald-400" :
-                        rec.recommendation === "buy" ? "bg-cyan-500/20 text-cyan-400" :
-                        "bg-slate-500/20 text-slate-400"
+                          rec.recommendation === "buy" ? "bg-cyan-500/20 text-cyan-400" :
+                            "bg-slate-500/20 text-slate-400"
                       )}>
                         {rec.recommendation.replace("_", " ")}
                       </Badge>
                       <Badge variant="outline" className={cn(
                         "text-xs",
                         rec.riskLevel === "low" ? "border-emerald-500/30 text-emerald-400" :
-                        rec.riskLevel === "medium" ? "border-amber-500/30 text-amber-400" :
-                        "border-red-500/30 text-red-400"
+                          rec.riskLevel === "medium" ? "border-amber-500/30 text-amber-400" :
+                            "border-red-500/30 text-red-400"
                       )}>
                         {rec.riskLevel} risk
                       </Badge>
@@ -2006,7 +2007,7 @@ Just ask me any of these questions or type your specific concern!`,
               AI Investment Tip
             </h4>
             <p className="text-xs text-slate-400">
-              Based on your {financialHealth?.savingsRate?.toFixed(0)}% savings rate and {financialHealth?.riskTolerance || 'moderate'} risk tolerance,
+              Based on your {financialHealth?.savingsRate?.toFixed(0) || '0'}% savings rate and {financialHealth?.riskTolerance || 'moderate'} risk tolerance,
               consider allocating {formatCurrency((netWorthBreakdown?.netWorth || 0) * 0.3)} (30% of net worth)
               to diversified investments for long-term growth.
             </p>

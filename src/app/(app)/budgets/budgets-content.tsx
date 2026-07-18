@@ -11,13 +11,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { supabase, getUser } from "@/lib/supabase";
-import { formatCurrency, Currency, Transaction, Budget, CATEGORIES } from "@/lib/nhost";
+import { formatCurrency, Currency, Transaction, Budget, CATEGORIES, buildFinancialPlan } from "@/lib/nhost";
 import { useSearchParams } from "next/navigation";
 
 export default function BudgetsContent() {
   const searchParams = useSearchParams();
   const currency = (searchParams.get("currency") as Currency) || "TZS";
-  
+
   const [budgets, setBudgets] = React.useState<Budget[]>([]);
   const [transactions, setTransactions] = React.useState<Transaction[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -29,6 +29,8 @@ export default function BudgetsContent() {
     monthly_limit: "",
     month: currentMonth,
   });
+
+  const plan = React.useMemo(() => buildFinancialPlan(transactions, currentMonth), [transactions, currentMonth]);
 
   React.useEffect(() => {
     fetchData();
@@ -44,7 +46,7 @@ export default function BudgetsContent() {
     }
     const [budgetRes, transRes] = await Promise.all([
       supabase.from('budgets').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-      supabase.from('transactions').select('*').eq('user_id', userId).eq('type', 'expense').order('date', { ascending: false }),
+      supabase.from('transactions').select('*').eq('user_id', userId).order('date', { ascending: false }),
     ]);
     if (budgetRes.data) setBudgets(budgetRes.data);
     if (transRes.data) setTransactions(transRes.data);
@@ -70,10 +72,28 @@ export default function BudgetsContent() {
     fetchData();
   }
 
+  async function applyRecommendedBudgets() {
+    const user = await getUser();
+    const userId = user?.id;
+    if (!userId) return;
+
+    const entries = Object.entries(plan.suggestedBudgets).map(([category, amount]) => ({
+      user_id: userId,
+      category,
+      monthly_limit: Math.round(amount),
+      month: currentMonth,
+    }));
+
+    if (entries.length === 0) return;
+
+    await supabase.from('budgets').upsert(entries, { onConflict: 'user_id,category,month' });
+    fetchData();
+  }
+
   const spendingByCategory = React.useMemo(() => {
     const map: Record<string, number> = {};
     transactions
-      .filter(t => t.date.startsWith(currentMonth))
+      .filter(t => t.type === 'expense' && t.date.startsWith(currentMonth))
       .forEach(t => {
         map[t.category] = (map[t.category] || 0) + Number(t.amount);
       });
@@ -89,7 +109,7 @@ export default function BudgetsContent() {
     let status: "success" | "warning" | "danger" = "success";
     if (percentage >= 95) status = "danger";
     else if (percentage >= 75) status = "warning";
-    
+
     return {
       ...budget,
       spent,
@@ -107,69 +127,111 @@ export default function BudgetsContent() {
 
   return (
     <main className="flex-1 space-y-6 bg-background/50 p-4 sm:p-6 overflow-x-auto">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Budgets</h1>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="mr-2 h-4 w-4" /> Set Budget</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Set Monthly Budget</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-4">
-              <div className="space-y-2">
-                <Label>Category</Label>
-                <Select
-                  value={formData.category}
-                  onValueChange={(v: string) => setFormData({ ...formData, category: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {unusedCategories.length > 0 ? (
-                      unusedCategories.map((cat) => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="">All categories have budgets</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Monthly Limit</Label>
-                <Input
-                  type="text"
-                  value={formData.monthly_limit}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9.]/g, '');
-                    setFormData({ ...formData, monthly_limit: value });
-                  }}
-                  placeholder="0.00"
-                  className="text-lg"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Month</Label>
-                <Input
-                  type="month"
-                  value={formData.month}
-                  onChange={(e) => setFormData({ ...formData, month: e.target.value })}
-                />
-              </div>
-              <Button 
-                onClick={addBudget} 
-                className="w-full"
-                disabled={unusedCategories.length === 0}
-              >
-                Set Budget
-              </Button>
+      <Card>
+        <CardContent className="space-y-4 pt-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">Budgets</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Suggested monthly savings: {formatCurrency(plan.recommendedMonthlySavings, currency)}
+              </p>
             </div>
-          </DialogContent>
-        </Dialog>
-      </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={applyRecommendedBudgets}>Auto-plan budgets</Button>
+              <Dialog open={isOpen} onOpenChange={setIsOpen}>
+                <DialogTrigger asChild>
+                  <Button><Plus className="mr-2 h-4 w-4" /> Set Budget</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Set Monthly Budget</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-4">
+                    <div className="space-y-2">
+                      <Label>Category</Label>
+                      <Select
+                        value={formData.category}
+                        onValueChange={(v: string) => setFormData({ ...formData, category: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {unusedCategories.length > 0 ? (
+                            unusedCategories.map((cat) => (
+                              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="">All categories have budgets</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Monthly Limit</Label>
+                      <Input
+                        type="text"
+                        value={formData.monthly_limit}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9.]/g, '');
+                          setFormData({ ...formData, monthly_limit: value });
+                        }}
+                        placeholder="0.00"
+                        className="text-lg"
+                      />
+                      {plan.suggestedBudgets[formData.category] ? (
+                        <p className="text-xs text-muted-foreground">
+                          Suggested healthy limit: {formatCurrency(plan.suggestedBudgets[formData.category], currency)}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Month</Label>
+                      <Input
+                        type="month"
+                        value={formData.month}
+                        onChange={(e) => setFormData({ ...formData, month: e.target.value })}
+                      />
+                    </div>
+                    <Button
+                      onClick={addBudget}
+                      className="w-full"
+                      disabled={unusedCategories.length === 0}
+                    >
+                      Set Budget
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium">Cash flow snapshot</p>
+              <p className="text-sm text-muted-foreground">
+                Income {formatCurrency(plan.monthlyIncome, currency)} • Expenses {formatCurrency(plan.monthlyExpenses, currency)} • Surplus {formatCurrency(plan.monthlySurplus, currency)}
+              </p>
+            </div>
+            <Badge className="w-fit bg-emerald-600/20 text-emerald-600">
+              {plan.monthlySurplus >= 0 ? 'Healthy surplus' : 'Review spending'}
+            </Badge>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border border-border/60 bg-background/40 p-3">
+              <p className="text-xs text-muted-foreground">Suggested savings</p>
+              <p className="text-lg font-semibold">{formatCurrency(plan.recommendedMonthlySavings, currency)}</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-background/40 p-3">
+              <p className="text-xs text-muted-foreground">Priority categories</p>
+              <p className="text-sm font-semibold">{plan.priorityCategories.slice(0, 2).join(', ') || 'No spending yet'}</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-background/40 p-3">
+              <p className="text-xs text-muted-foreground">Budgeting rule</p>
+              <p className="text-sm font-semibold">Keep flexible categories under 70% of income</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Budget Progress */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
@@ -188,8 +250,8 @@ export default function BudgetsContent() {
                     {formatCurrency(budget.spent, currency)} of {formatCurrency(Number(budget.monthly_limit), currency)}
                   </p>
                 </div>
-                <Button 
-                  size="sm" 
+                <Button
+                  size="sm"
                   onClick={() => deleteBudget(budget.id)}
                   className="text-muted-foreground hover:text-foreground"
                 >
@@ -197,19 +259,18 @@ export default function BudgetsContent() {
                 </Button>
               </div>
               <div className="mt-4">
-                <Progress 
-                  value={budget.percentage} 
-                  className={`h-3 ${
-                    budget.status === "danger" ? "bg-red-200 [&>div]:bg-red-500" :
+                <Progress
+                  value={budget.percentage}
+                  className={`h-3 ${budget.status === "danger" ? "bg-red-200 [&>div]:bg-red-500" :
                     budget.status === "warning" ? "bg-amber-200 [&>div]:bg-amber-500" :
-                    "bg-green-200 [&>div]:bg-green-500"
-                  }`}
+                      "bg-green-200 [&>div]:bg-green-500"
+                    }`}
                 />
                 <div className="flex justify-between mt-2 text-xs">
                   <span className={`
                     ${budget.status === "danger" ? "text-red-600" :
                       budget.status === "warning" ? "text-amber-600" :
-                      "text-green-600"}
+                        "text-green-600"}
                   `}>
                     {budget.percentage.toFixed(0)}% used
                   </span>

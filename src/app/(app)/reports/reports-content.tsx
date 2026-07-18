@@ -29,6 +29,7 @@ export default function ReportsContent() {
   const currency = (searchParams.get("currency") as Currency) || "TZS";
 
   const [transactions, setTransactions] = React.useState<Transaction[]>([]);
+  const [assets, setAssets] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [selectedMonth, setSelectedMonth] = React.useState<string>(
     new Date().toISOString().slice(0, 7)
@@ -46,12 +47,17 @@ export default function ReportsContent() {
       setLoading(false);
       return;
     }
-    const { data } = await supabase
-      .from('transactions')
-      .select('id, user_id, type, amount, category, date, note, is_recurring, created_at')
-      .eq('user_id', userId)
-      .order('date', { ascending: false });
-    if (data) setTransactions(data);
+    const [transRes, assetsRes] = await Promise.all([
+      supabase
+        .from('transactions')
+        .select('id, user_id, type, amount, category, date, note, is_recurring, asset_id, income_source, created_at')
+        .eq('user_id', userId)
+        .order('date', { ascending: false }),
+      supabase.from('user_assets').select('id, name, type, balance, currency').eq('user_id', userId),
+    ]);
+
+    if (transRes.data) setTransactions(transRes.data);
+    if (assetsRes.data) setAssets(assetsRes.data);
     setLoading(false);
   }
 
@@ -89,6 +95,28 @@ export default function ReportsContent() {
       });
     return map;
   }, [filteredTransactions]);
+
+  const incomeBySource = React.useMemo(() => {
+    const map: Record<string, number> = {};
+    filteredTransactions
+      .filter(t => t.type === "income")
+      .forEach(t => {
+        const source = t.income_source || "Other";
+        map[source] = (map[source] || 0) + Number(t.amount);
+      });
+    return map;
+  }, [filteredTransactions]);
+
+  const incomeByAsset = React.useMemo(() => {
+    const map: Record<string, number> = {};
+    filteredTransactions
+      .filter(t => t.type === "income")
+      .forEach(t => {
+        const assetName = t.asset_id ? (assets.find(asset => asset.id === t.asset_id)?.name || "Linked Asset") : "No asset";
+        map[assetName] = (map[assetName] || 0) + Number(t.amount);
+      });
+    return map;
+  }, [filteredTransactions, assets]);
 
   const monthlyTrend = React.useMemo(() => {
     const months: Record<string, { income: number; expense: number }> = {};
@@ -301,38 +329,98 @@ export default function ReportsContent() {
         </Card>
       </div>
 
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              Category Breakdown
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {Object.entries(spendingByCategory)
+                .sort(([, a], [, b]) => b - a)
+                .map(([category, amount]) => {
+                  const percentage = totalSpending > 0 ? ((amount / totalSpending) * 100).toFixed(1) : "0";
+                  return (
+                    <div key={category} className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/30 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <Badge variant="secondary">{category}</Badge>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold">{formatCurrency(amount, currency)}</p>
+                        <p className="text-xs text-muted-foreground">{percentage}% of total</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              {Object.keys(spendingByCategory).length === 0 && (
+                <div className="py-12 text-center">
+                  <BarChart3 className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
+                  <p className="text-muted-foreground font-medium">No spending data for {selectedMonth}</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Add transactions to see your spending breakdown
+                  </p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-emerald-500" />
+              Income by Source
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {Object.entries(incomeBySource)
+                .sort(([, a], [, b]) => b - a)
+                .map(([source, amount]) => (
+                  <div key={source} className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/30 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600">{source}</Badge>
+                    </div>
+                    <p className="font-semibold text-emerald-600">{formatCurrency(amount, currency)}</p>
+                  </div>
+                ))}
+              {Object.keys(incomeBySource).length === 0 && (
+                <div className="py-12 text-center">
+                  <TrendingUp className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
+                  <p className="text-muted-foreground font-medium">No income data for {selectedMonth}</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-primary" />
-            Category Breakdown
+            <PieChart className="h-5 w-5 text-primary" />
+            Income by Linked Asset
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {Object.entries(spendingByCategory)
-              .sort(([,a], [,b]) => b - a)
-              .map(([category, amount]) => {
-                const percentage = totalSpending > 0 ? ((amount / totalSpending) * 100).toFixed(1) : "0";
-                return (
-                  <div key={category} className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/30 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <Badge variant="secondary">{category}</Badge>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold">{formatCurrency(amount, currency)}</p>
-                      <p className="text-xs text-muted-foreground">{percentage}% of total</p>
-                    </div>
+            {Object.entries(incomeByAsset)
+              .sort(([, a], [, b]) => b - a)
+              .map(([asset, amount]) => (
+                <div key={asset} className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <Badge variant="secondary">{asset}</Badge>
                   </div>
-                );
-              })}
-            {Object.keys(spendingByCategory).length === 0 && (
+                  <p className="font-semibold">{formatCurrency(amount, currency)}</p>
+                </div>
+              ))}
+            {Object.keys(incomeByAsset).length === 0 && (
               <div className="py-12 text-center">
-                <BarChart3 className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
-                <p className="text-muted-foreground font-medium">No spending data for {selectedMonth}</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Add transactions to see your spending breakdown
-                </p>
+                <PieChart className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
+                <p className="text-muted-foreground font-medium">No asset-linked income for {selectedMonth}</p>
               </div>
             )}
           </div>

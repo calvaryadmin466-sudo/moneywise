@@ -19,11 +19,11 @@ export function useRealtimeData() {
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-    
+
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
     setIsOnline(navigator.onLine);
-    
+
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
@@ -33,11 +33,11 @@ export function useRealtimeData() {
   // Poll for changes every 5 seconds when online
   useEffect(() => {
     if (!isOnline) return;
-    
+
     const interval = setInterval(async () => {
       await checkForChanges();
     }, 5000);
-    
+
     return () => clearInterval(interval);
   }, [isOnline, lastSync]);
 
@@ -46,7 +46,7 @@ export function useRealtimeData() {
     if (!user) return;
 
     const since = new Date(lastSync).toISOString();
-    
+
     // Check for recent changes across all tables
     const [transChanges, budgetChanges, goalChanges, debtChanges] = await Promise.all([
       gqlRequest(`
@@ -120,9 +120,9 @@ export function useRealtimeData() {
     ]);
 
     const newChanges: DataChange[] = [];
-    
-    if (transChanges.data?.transactions?.length > 0) {
-      transChanges.data.transactions.forEach((t: any) => {
+
+    if (transChanges.data && Array.isArray((transChanges.data as any).transactions) && (transChanges.data as any).transactions.length > 0) {
+      (transChanges.data as any).transactions.forEach((t: any) => {
         newChanges.push({
           type: "transaction",
           action: t.updated_at > t.created_at ? "update" : "insert",
@@ -131,9 +131,9 @@ export function useRealtimeData() {
         });
       });
     }
-    
-    if (budgetChanges.data?.budgets?.length > 0) {
-      budgetChanges.data.budgets.forEach((b: any) => {
+
+    if (budgetChanges.data && Array.isArray((budgetChanges.data as any).budgets) && (budgetChanges.data as any).budgets.length > 0) {
+      (budgetChanges.data as any).budgets.forEach((b: any) => {
         newChanges.push({
           type: "budget",
           action: b.updated_at > b.created_at ? "update" : "insert",
@@ -142,9 +142,9 @@ export function useRealtimeData() {
         });
       });
     }
-    
-    if (goalChanges.data?.goals?.length > 0) {
-      goalChanges.data.goals.forEach((g: any) => {
+
+    if (goalChanges.data && Array.isArray((goalChanges.data as any).goals) && (goalChanges.data as any).goals.length > 0) {
+      (goalChanges.data as any).goals.forEach((g: any) => {
         newChanges.push({
           type: "goal",
           action: g.updated_at > g.created_at ? "update" : "insert",
@@ -153,9 +153,9 @@ export function useRealtimeData() {
         });
       });
     }
-    
-    if (debtChanges.data?.debts?.length > 0) {
-      debtChanges.data.debts.forEach((d: any) => {
+
+    if (debtChanges.data && Array.isArray((debtChanges.data as any).debts) && (debtChanges.data as any).debts.length > 0) {
+      (debtChanges.data as any).debts.forEach((d: any) => {
         newChanges.push({
           type: "debt",
           action: d.updated_at > d.created_at ? "update" : "insert",
@@ -189,11 +189,11 @@ export function useRealtimeData() {
 // Hook for tracking user activity and behavior patterns
 export function useUserActivity() {
   const [activity, setActivity] = useState<any[]>([]);
-  
+
   const trackActivity = useCallback(async (action: string, metadata?: any) => {
     const user = await getUser();
     if (!user) return;
-    
+
     // Store activity locally and sync when online
     const newActivity = {
       user_id: user.id,
@@ -202,9 +202,9 @@ export function useUserActivity() {
       timestamp: Date.now(),
       synced: false,
     };
-    
+
     setActivity((prev) => [newActivity, ...prev].slice(0, 100));
-    
+
     // Sync to server
     try {
       await gqlRequest(
@@ -225,6 +225,6 @@ export function useUserActivity() {
       console.log("Activity sync failed, will retry later");
     }
   }, []);
-  
+
   return { activity, trackActivity };
 }

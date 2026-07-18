@@ -37,6 +37,7 @@ export default function TransactionsContent() {
     note: "",
     is_recurring: false,
     asset_id: "" as string,
+    income_source: "" as string,
   });
 
   React.useEffect(() => {
@@ -67,9 +68,9 @@ export default function TransactionsContent() {
     const user = await getUser();
     const userId = user?.id;
     if (!userId) return;
-    
+
     const amount = Number(formData.amount);
-    
+
     // Add transaction using Supabase
     const { error: transError } = await supabase
       .from('transactions')
@@ -81,17 +82,19 @@ export default function TransactionsContent() {
         date: formData.date,
         note: formData.note || null,
         is_recurring: formData.is_recurring,
+        asset_id: formData.asset_id || null,
+        income_source: formData.type === 'income' ? (formData.income_source || null) : null,
       });
-    
+
     // If asset selected, update asset balance
     if (!transError && formData.asset_id) {
       const selectedAsset = assets.find(a => a.id === formData.asset_id);
       if (selectedAsset) {
         const currentBalance = parseFloat(selectedAsset.balance) || 0;
-        const newBalance = formData.type === "income" 
-          ? currentBalance + amount 
+        const newBalance = formData.type === "income"
+          ? currentBalance + amount
           : currentBalance - amount;
-        
+
         await supabase
           .from('user_assets')
           .update({ balance: newBalance, updated_at: new Date().toISOString() })
@@ -99,7 +102,7 @@ export default function TransactionsContent() {
           .eq('user_id', userId);
       }
     }
-    
+
     if (!transError) {
       fetchTransactionsAndAssets();
       setIsAddOpen(false);
@@ -111,6 +114,7 @@ export default function TransactionsContent() {
         note: "",
         is_recurring: false,
         asset_id: "",
+        income_source: "",
       });
     }
   }
@@ -152,13 +156,15 @@ export default function TransactionsContent() {
       date: transaction.date,
       note: transaction.note || "",
       is_recurring: transaction.is_recurring,
+      asset_id: transaction.asset_id || "",
+      income_source: transaction.income_source || "",
     });
     setIsEditOpen(true);
   }
 
   const filteredTransactions = transactions.filter((t) => {
     const matchesSearch = t.category.toLowerCase().includes(search.toLowerCase()) ||
-                         (t.note && t.note.toLowerCase().includes(search.toLowerCase()));
+      (t.note && t.note.toLowerCase().includes(search.toLowerCase()));
     const matchesType = filterType === "all" || t.type === filterType;
     const matchesCategory = filterCategory === "all" || t.category === filterCategory;
     return matchesSearch && matchesType && matchesCategory;
@@ -208,7 +214,7 @@ export default function TransactionsContent() {
           </SelectContent>
         </Select>
       </div>
-      
+
       {assets.length > 0 && (
         <div className="space-y-2">
           <Label>Link to Asset (Optional)</Label>
@@ -229,13 +235,35 @@ export default function TransactionsContent() {
             </SelectContent>
           </Select>
           <p className="text-xs text-gray-500">
-            {formData.type === "income" 
-              ? "Income will ADD to selected asset balance" 
+            {formData.type === "income"
+              ? "Income will ADD to selected asset balance"
               : "Expense will SUBTRACT from selected asset balance"}
           </p>
         </div>
       )}
-      
+
+      {formData.type === "income" && (
+        <div className="space-y-2">
+          <Label>Source of Income</Label>
+          <Select
+            value={formData.income_source}
+            onValueChange={(v: string) => setFormData({ ...formData, income_source: v })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select income source" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Personal Business">Personal Business</SelectItem>
+              <SelectItem value="Work">Work</SelectItem>
+              <SelectItem value="Projects">Projects</SelectItem>
+              <SelectItem value="Farming">Farming</SelectItem>
+              <SelectItem value="Other">Other</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-gray-500">Choose where the income came from for better tracking.</p>
+        </div>
+      )}
+
       <div className="space-y-2">
         <Label>Date</Label>
         <Input
@@ -370,9 +398,8 @@ export default function TransactionsContent() {
             {filteredTransactions.map((t) => (
               <div key={t.id} className="flex items-center justify-between rounded-lg border p-4 hover:bg-muted/30 transition-colors">
                 <div className="flex items-center gap-4">
-                  <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                    t.type === "income" ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
-                  }`}>
+                  <div className={`h-10 w-10 rounded-full flex items-center justify-center ${t.type === "income" ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
+                    }`}>
                     {t.type === "income" ? <ArrowUpCircle className="h-5 w-5" /> : <ArrowDownCircle className="h-5 w-5" />}
                   </div>
                   <div>

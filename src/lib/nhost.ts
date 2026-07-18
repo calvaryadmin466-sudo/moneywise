@@ -46,38 +46,38 @@ export async function signIn(email: string, password: string) {
     const baseUrl = getAuthUrl()
     const url = `${baseUrl}/v1/signin/email-password`
     console.log('SignIn URL:', url)
-    
+
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
       body: JSON.stringify({ email, password }),
     })
-    
+
     const text = await response.text()
     console.log('SignIn status:', response.status)
     console.log('SignIn response:', text.substring(0, 500))
-    
+
     let data
     try {
       data = JSON.parse(text)
     } catch {
       return { data: null, error: new Error(`Server error (${response.status}): ${text.substring(0, 100)}`) }
     }
-    
+
     if (!response.ok) {
       return { data: null, error: new Error(data?.message || data?.error || `Sign in failed (${response.status})`) }
     }
-    
+
     if (data?.session) {
       setSession({
         accessToken: data.session.accessToken,
         user: data.session.user
       })
     }
-    
+
     return { data, error: null }
   } catch (err: unknown) {
     console.error('SignIn error:', err)
@@ -90,20 +90,20 @@ export async function signUp(email: string, password: string) {
     const baseUrl = getAuthUrl()
     const url = `${baseUrl}/v1/signup/email-password`
     console.log('SignUp URL:', url)
-    
+
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
       body: JSON.stringify({ email, password }),
     })
-    
+
     const text = await response.text()
     console.log('SignUp status:', response.status)
     console.log('SignUp response:', text.substring(0, 500))
-    
+
     let data
     try {
       data = JSON.parse(text)
@@ -111,11 +111,11 @@ export async function signUp(email: string, password: string) {
       console.error('JSON parse error:', e)
       return { data: null, error: new Error(`Server error (${response.status}): ${text.substring(0, 100)}`) }
     }
-    
+
     if (!response.ok) {
       return { data: null, error: new Error(data?.message || data?.error || `Sign up failed (${response.status})`) }
     }
-    
+
     return { data, error: null }
   } catch (err: unknown) {
     console.error('SignUp error:', err)
@@ -133,13 +133,13 @@ export async function resendVerificationEmail(email: string) {
     const baseUrl = getAuthUrl()
     const response = await fetch(`${baseUrl}/v1/user/email/send-verification-email`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
       body: JSON.stringify({ email }),
     })
-    
+
     const text = await response.text()
     let data
     try {
@@ -147,11 +147,11 @@ export async function resendVerificationEmail(email: string) {
     } catch {
       return { error: new Error('Failed to resend verification email') }
     }
-    
+
     if (!response.ok) {
       return { error: new Error(data?.message || data?.error || 'Failed to resend verification') }
     }
-    
+
     return { error: null }
   } catch (err: unknown) {
     return { error: err instanceof Error ? err : new Error('Failed to resend verification') }
@@ -175,10 +175,10 @@ async function refreshSession() {
   // No need for token refresh with this implementation
 }
 
-export async function gqlRequest<T = unknown>(query: string, variables?: Record<string, unknown>): Promise<{ data?: T; error?: string }> {
+export async function gqlRequest<T = any>(query: string, variables?: Record<string, unknown>): Promise<{ data?: T; error?: string }> {
   try {
     const token = await getAccessToken()
-    const graphqlUrl = process.env.NEXT_PUBLIC_NHOST_GRAPHQL_URL || 
+    const graphqlUrl = process.env.NEXT_PUBLIC_NHOST_GRAPHQL_URL ||
       `https://${NHOST_CONFIG.subdomain}.graphql.${NHOST_CONFIG.region}.nhost.run/v1`
     const response = await fetch(graphqlUrl, {
       method: 'POST',
@@ -255,6 +255,8 @@ export interface Transaction {
   date: string
   note: string | null
   is_recurring: boolean
+  asset_id: string | null
+  income_source: string | null
   created_at: string
 }
 
@@ -275,6 +277,101 @@ export interface Goal {
   saved_amount: number
   deadline: string | null
   created_at: string
+}
+
+export interface FinancialPlanSummary {
+  monthlyIncome: number
+  monthlyExpenses: number
+  monthlySurplus: number
+  recommendedMonthlySavings: number
+  suggestedBudgets: Record<string, number>
+  priorityCategories: string[]
+}
+
+export function buildFinancialPlan(transactions: Transaction[], month: string): FinancialPlanSummary {
+  const monthKey = month.slice(0, 7)
+  const monthTransactions = transactions.filter(transaction => transaction.date.startsWith(monthKey) && transaction.type === 'expense')
+  const monthIncome = transactions
+    .filter(transaction => transaction.date.startsWith(monthKey) && transaction.type === 'income')
+    .reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0)
+
+  const monthlyExpenses = monthTransactions.reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0)
+  const monthlySurplus = monthIncome - monthlyExpenses
+
+  const monthBuckets = new Map<string, { income: number; expenses: Record<string, number> }>()
+
+  transactions.forEach(transaction => {
+    const bucket = transaction.date.slice(0, 7)
+    if (!monthBuckets.has(bucket)) {
+      monthBuckets.set(bucket, { income: 0, expenses: {} })
+    }
+
+    const bucketData = monthBuckets.get(bucket)!
+    if (transaction.type === 'income') {
+      bucketData.income += Number(transaction.amount || 0)
+    } else {
+      const category = transaction.category || 'Other'
+      bucketData.expenses[category] = (bucketData.expenses[category] || 0) + Number(transaction.amount || 0)
+    }
+  })
+
+  const recentMonths = Array.from(monthBuckets.keys()).sort().slice(-3)
+  const categoryAverages: Record<string, number> = {}
+
+  CATEGORIES.forEach(category => {
+    const values = recentMonths
+      .map(month => monthBuckets.get(month)?.expenses[category] || 0)
+      .filter(value => value > 0)
+
+    if (values.length > 0) {
+      categoryAverages[category] = values.reduce((sum, value) => sum + value, 0) / values.length
+    }
+  })
+
+  const essentialCategories = ['Housing', 'Utilities', 'Food', 'Healthcare', 'Education', 'Transport']
+  const discretionaryCategories = ['Entertainment', 'Shopping', 'Personal', 'Other']
+  const suggestedBudgets: Record<string, number> = {}
+
+  Object.entries(categoryAverages).forEach(([category, average]) => {
+    const buffer = essentialCategories.includes(category) ? 1.08 : 0.95
+    const suggested = Math.max(average * buffer, average > 0 ? average * 0.9 : 0)
+    suggestedBudgets[category] = suggested
+  })
+
+  const currentExpenseTotal = Object.values(monthTransactions.reduce((acc, transaction) => {
+    const category = transaction.category || 'Other'
+    acc[category] = (acc[category] || 0) + Number(transaction.amount || 0)
+    return acc
+  }, {} as Record<string, number>))
+    .reduce((sum, value) => sum + value, 0)
+
+  const budgetCap = Math.max(monthIncome * 0.7 - currentExpenseTotal, monthIncome * 0.2)
+  const totalSuggested = Object.values(suggestedBudgets).reduce((sum, value) => sum + value, 0)
+
+  if (totalSuggested > budgetCap && totalSuggested > 0) {
+    const scale = budgetCap / totalSuggested
+    Object.keys(suggestedBudgets).forEach(category => {
+      suggestedBudgets[category] = Number((suggestedBudgets[category] * scale).toFixed(0))
+    })
+  }
+
+  const priorityCategories = Object.entries(monthTransactions.reduce((acc, transaction) => {
+    const category = transaction.category || 'Other'
+    acc[category] = (acc[category] || 0) + Number(transaction.amount || 0)
+    return acc
+  }, {} as Record<string, number>))
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([category]) => category)
+
+  return {
+    monthlyIncome: monthIncome,
+    monthlyExpenses,
+    monthlySurplus,
+    recommendedMonthlySavings: monthlySurplus > 0 ? Math.max(monthlySurplus * 0.3, monthIncome * 0.05) : Math.max(monthIncome * 0.02, 0),
+    suggestedBudgets,
+    priorityCategories,
+  }
 }
 
 export interface Debt {
@@ -309,13 +406,13 @@ export async function insertAssetDirect(asset: Omit<Asset, 'id' | 'created_at' |
     const token = await getAccessToken()
     const user = await getUser()
     if (!user) return { error: 'Not authenticated' }
-    
+
     // Generate UUID for the asset
     const id = crypto.randomUUID()
-    
+
     // Use direct database REST API
     const dbUrl = `https://${NHOST_CONFIG.subdomain}.db.${NHOST_CONFIG.region}.nhost.run/v1/graphql`
-    
+
     const response = await fetch(dbUrl, {
       method: 'POST',
       headers: {
@@ -355,7 +452,7 @@ export async function insertAssetDirect(asset: Omit<Asset, 'id' | 'created_at' |
         }`
       })
     })
-    
+
     const result = await response.json()
     if (result.errors) {
       return { error: result.errors[0].message }
@@ -379,9 +476,9 @@ export async function saveProfileDirect(profile: {
   try {
     const token = await getAccessToken()
     if (!token) return { error: 'Not authenticated' }
-    
+
     const dbUrl = `https://${NHOST_CONFIG.subdomain}.db.${NHOST_CONFIG.region}.nhost.run/v1/graphql`
-    
+
     const response = await fetch(dbUrl, {
       method: 'POST',
       headers: {
@@ -413,7 +510,7 @@ export async function saveProfileDirect(profile: {
         }`
       })
     })
-    
+
     const result = await response.json()
     if (result.errors) {
       return { error: result.errors[0].message }

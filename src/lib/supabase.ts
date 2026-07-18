@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://example.supabase.co'
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key'
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
@@ -28,12 +28,26 @@ export async function signIn(email: string, password: string) {
   return { user: data.user, session: data.session, error }
 }
 
+export async function resendVerificationEmail(email: string) {
+  try {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+    })
+    return { error }
+  } catch (error) {
+    return { error: error as Error }
+  }
+}
+
 export async function signUp(email: string, password: string) {
+  const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/dashboard` : undefined
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      emailRedirectTo: `${window.location.origin}/dashboard`,
+      emailRedirectTo: redirectTo,
     }
   })
   return { user: data.user, session: data.session, error }
@@ -99,6 +113,8 @@ export type Transaction = {
   note: string | null
   date: string
   is_recurring: boolean
+  asset_id: string | null
+  income_source: string | null
   created_at: string
 }
 

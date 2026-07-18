@@ -10,14 +10,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { supabase, getUser } from "@/lib/supabase";
-import { formatCurrency, Currency, Goal } from "@/lib/nhost";
+import { formatCurrency, Currency, Goal, buildFinancialPlan } from "@/lib/nhost";
 import { useSearchParams } from "next/navigation";
 
 export default function GoalsContent() {
   const searchParams = useSearchParams();
   const currency = (searchParams.get("currency") as Currency) || "TZS";
-  
+
   const [goals, setGoals] = React.useState<Goal[]>([]);
+  const [transactions, setTransactions] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [isAddOpen, setIsAddOpen] = React.useState(false);
   const [isContributeOpen, setIsContributeOpen] = React.useState(false);
@@ -42,12 +43,12 @@ export default function GoalsContent() {
       setLoading(false);
       return;
     }
-    const { data, error } = await supabase
-      .from('goals')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-    if (data) setGoals(data);
+    const [goalsRes, transactionsRes] = await Promise.all([
+      supabase.from('goals').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+      supabase.from('transactions').select('*').eq('user_id', userId).order('date', { ascending: false }),
+    ]);
+    if (goalsRes.data) setGoals(goalsRes.data);
+    if (transactionsRes.data) setTransactions(transactionsRes.data);
     setLoading(false);
   }
 
@@ -96,6 +97,8 @@ export default function GoalsContent() {
     setIsContributeOpen(true);
   }
 
+  const plan = React.useMemo(() => buildFinancialPlan(transactions, new Date().toISOString().slice(0, 7)), [transactions]);
+
   function getDaysRemaining(deadline: string | null): number | null {
     if (!deadline) return null;
     const days = Math.ceil((new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
@@ -106,8 +109,13 @@ export default function GoalsContent() {
 
   return (
     <main className="flex-1 space-y-6 bg-background/50 p-4 sm:p-6 overflow-x-auto">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Savings Goals</h1>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Savings Goals</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            A practical target is to save about {formatCurrency(plan.recommendedMonthlySavings, currency)} per month.
+          </p>
+        </div>
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
           <DialogTrigger asChild>
             <Button><Plus className="mr-2 h-4 w-4" /> New Goal</Button>
@@ -145,6 +153,11 @@ export default function GoalsContent() {
                   value={formData.deadline}
                   onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
                 />
+                {formData.target_amount ? (
+                  <p className="text-xs text-muted-foreground">
+                    Suggested monthly contribution: {formatCurrency(plan.recommendedMonthlySavings, currency)}
+                  </p>
+                ) : null}
               </div>
               <Button onClick={addGoal} className="w-full">Create Goal</Button>
             </div>
@@ -152,11 +165,41 @@ export default function GoalsContent() {
         </Dialog>
       </div>
 
+      <Card>
+        <CardContent className="pt-6 space-y-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium">Goal pacing</p>
+              <p className="text-sm text-muted-foreground">
+                Monthly surplus: {formatCurrency(plan.monthlySurplus, currency)} • Suggested saving pace: {formatCurrency(plan.recommendedMonthlySavings, currency)}
+              </p>
+            </div>
+            <Badge className="w-fit bg-cyan-600/20 text-cyan-600">
+              {plan.monthlySurplus >= 0 ? 'On track for savings' : 'Trim discretionary spending first'}
+            </Badge>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border border-border/60 bg-background/40 p-3">
+              <p className="text-xs text-muted-foreground">Income</p>
+              <p className="text-lg font-semibold">{formatCurrency(plan.monthlyIncome, currency)}</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-background/40 p-3">
+              <p className="text-xs text-muted-foreground">Expenses</p>
+              <p className="text-lg font-semibold">{formatCurrency(plan.monthlyExpenses, currency)}</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-background/40 p-3">
+              <p className="text-xs text-muted-foreground">Suggested monthly deposit</p>
+              <p className="text-lg font-semibold">{formatCurrency(plan.recommendedMonthlySavings, currency)}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         {goals.map((goal) => {
           const percentage = Math.min((Number(goal.saved_amount) / Number(goal.target_amount)) * 100, 100);
           const daysLeft = getDaysRemaining(goal.deadline);
-          
+
           return (
             <Card key={goal.id}>
               <CardContent className="pt-6">
@@ -175,8 +218,8 @@ export default function GoalsContent() {
                       )}
                     </div>
                   </div>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     size="icon"
                     onClick={() => deleteGoal(goal.id)}
                   >
@@ -202,7 +245,7 @@ export default function GoalsContent() {
                   </div>
                 </div>
 
-                <Button 
+                <Button
                   onClick={() => openContribute(goal)}
                   className="w-full mt-4"
                   disabled={percentage >= 100}

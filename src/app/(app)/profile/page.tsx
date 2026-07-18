@@ -73,7 +73,7 @@ export default function ProfilePage() {
       setProfile(data);
     } else {
       // Set email from auth user
-      setProfile(prev => ({ ...prev, email: user.email }));
+      setProfile(prev => ({ ...prev, email: user.email ?? "" }));
     }
   }
 
@@ -148,14 +148,14 @@ export default function ProfilePage() {
       const reader = new FileReader();
       reader.onloadend = async () => {
         const base64String = reader.result as string;
-        
+
         // Update local state for preview
         setProfile(prev => ({ ...prev, avatar_url: base64String }));
 
         // Upload to Supabase Storage
         const fileExt = file.name.split('.').pop();
         const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-        
+
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('avatars')
           .upload(fileName, file, { upsert: true });
@@ -178,7 +178,7 @@ export default function ProfilePage() {
           });
 
         setProfile(prev => ({ ...prev, avatar_url: publicUrl }));
-        
+
         toast({
           title: "Success",
           description: "Profile picture updated!",
@@ -221,7 +221,7 @@ export default function ProfilePage() {
                   <User className="h-10 w-10 text-white" />
                 </AvatarFallback>
               </Avatar>
-              <button 
+              <button
                 onClick={triggerFileInput}
                 disabled={uploadingImage}
                 className="absolute bottom-0 right-0 p-2 bg-cyan-500 rounded-full text-white hover:bg-cyan-400 disabled:opacity-50"
