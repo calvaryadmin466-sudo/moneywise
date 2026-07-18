@@ -107,6 +107,22 @@ export default function TransactionsContent() {
         is_recurring: formData.is_recurring,
       });
 
+    if (!transError && formData.asset_id) {
+      const selectedAsset = assets.find(a => a.id === formData.asset_id);
+      if (selectedAsset) {
+        const currentBalance = parseFloat(selectedAsset.balance) || 0;
+        const newBalance = formData.type === "income"
+          ? currentBalance + amount
+          : currentBalance - amount;
+
+        await supabase
+          .from('user_assets')
+          .update({ balance: newBalance, updated_at: new Date().toISOString() })
+          .eq('id', formData.asset_id)
+          .eq('user_id', userId);
+      }
+    }
+
     if (!transError) {
       fetchTransactionsAndAssets();
       setIsAddOpen(false);
