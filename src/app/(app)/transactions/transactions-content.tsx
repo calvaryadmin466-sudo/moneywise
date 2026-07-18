@@ -23,7 +23,10 @@ export default function TransactionsContent() {
   const [assets, setAssets] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
-  const [filterType, setFilterType] = React.useState<string>("all");
+  const [filterType, setFilterType] = React.useState<string>(() => {
+    const type = searchParams.get("type");
+    return type === "income" || type === "expense" ? type : "all";
+  });
   const [filterCategory, setFilterCategory] = React.useState<string>("all");
   const [isEditOpen, setIsEditOpen] = React.useState(false);
   const [isAddOpen, setIsAddOpen] = React.useState(false);
@@ -43,6 +46,12 @@ export default function TransactionsContent() {
   React.useEffect(() => {
     fetchTransactionsAndAssets();
   }, []);
+
+  React.useEffect(() => {
+    const type = searchParams.get("type");
+    const nextType = type === "income" || type === "expense" ? type : "all";
+    setFilterType(nextType);
+  }, [searchParams]);
 
   async function fetchTransactionsAndAssets() {
     setLoading(true);

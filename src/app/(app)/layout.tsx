@@ -18,6 +18,7 @@ import {
   LogOut,
   Database,
   Coins,
+  TrendingUp,
 } from "lucide-react";
 import {
   SidebarProvider,
@@ -53,10 +54,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // Check auth on mount and listen for auth state changes
   React.useEffect(() => {
     let mounted = true;
-    
+
     async function checkAuth() {
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (!session?.user) {
         router.push('/login');
       } else if (mounted) {
@@ -67,7 +68,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           .select('full_name, avatar_url')
           .eq('id', session.user.id)
           .single();
-        
+
         setUserData({
           name: profile?.full_name || session.user.email?.split('@')[0] || 'User',
           email: session.user.email || '',
@@ -76,14 +77,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       }
     }
     checkAuth();
-    
+
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
         router.push('/login');
       }
     });
-    
+
     return () => {
       mounted = false;
       subscription.unsubscribe();
@@ -96,13 +97,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       const { data: { session } } = await supabase.auth.getSession();
       const userId = session?.user?.id;
       if (!userId) return;
-      
+
       const { data } = await supabase
         .from('transactions')
         .select('*')
         .eq('user_id', userId)
         .order('date', { ascending: false });
-      
+
       if (data) {
         setTransactions(data);
       }
@@ -116,9 +117,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <AddTransactionSheet isOpen={isSheetOpen} setIsOpen={setSheetOpen} />
-      <SpendingInsightsDialog 
-        isOpen={isInsightsOpen} 
-        setIsOpen={setInsightsOpen} 
+      <SpendingInsightsDialog
+        isOpen={isInsightsOpen}
+        setIsOpen={setInsightsOpen}
         transactions={transactions}
       />
       <Sidebar className="border-r border-white/10 bg-[#0f172a]/95 backdrop-blur-xl">
@@ -145,6 +146,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/transactions') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
                 <Receipt className="h-5 w-5" />
                 <span className="font-medium">Transactions</span>
+              </div>
+            </Link>
+            <Link href="/transactions?type=income" className="block">
+              <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/transactions') && pathname.includes('type=income') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
+                <TrendingUp className="h-5 w-5" />
+                <span className="font-medium">Income</span>
               </div>
             </Link>
             <Link href="/budgets" className="block">
@@ -198,7 +205,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </nav>
         </SidebarContent>
         <SidebarFooter className="border-t border-white/10 p-4">
-          <button 
+          <button
             onClick={() => setSheetOpen(true)}
             className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-medium py-3 rounded-lg transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.5)]"
           >
@@ -238,9 +245,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </Sidebar>
 
       <SidebarInset className="bg-transparent overflow-auto min-h-screen">
-         <header className="flex items-center justify-between border-b border-white/10 bg-[#0f172a]/50 backdrop-blur-xl p-4 sm:p-6">
+        <header className="flex items-center justify-between border-b border-white/10 bg-[#0f172a]/50 backdrop-blur-xl p-4 sm:p-6">
           <div className="flex items-center gap-4">
-             <SidebarTrigger className="md:hidden text-gray-400" />
+            <SidebarTrigger className="md:hidden text-gray-400" />
             <h1 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">{capitalizedTitle}</h1>
           </div>
           <div className="flex items-center gap-3">
