@@ -31,6 +31,7 @@ export default function TransactionsContent() {
   const [isEditOpen, setIsEditOpen] = React.useState(false);
   const [isAddOpen, setIsAddOpen] = React.useState(false);
   const [editingTransaction, setEditingTransaction] = React.useState<Transaction | null>(null);
+  const hasOpenedFromLink = React.useRef(false);
 
   const [formData, setFormData] = React.useState({
     type: "expense" as "income" | "expense",
@@ -51,6 +52,14 @@ export default function TransactionsContent() {
     const type = searchParams.get("type");
     const nextType = type === "income" || type === "expense" ? type : "all";
     setFilterType(nextType);
+
+    if (type === "income" && !hasOpenedFromLink.current) {
+      setFormData((prev) => ({ ...prev, type: "income" }));
+      setIsAddOpen(true);
+      hasOpenedFromLink.current = true;
+    } else if (type !== "income") {
+      hasOpenedFromLink.current = false;
+    }
   }, [searchParams]);
 
   async function fetchTransactionsAndAssets() {
@@ -71,6 +80,11 @@ export default function TransactionsContent() {
     if (transRes.data) setTransactions(transRes.data);
     if (assetsRes.data) setAssets(assetsRes.data);
     setLoading(false);
+  }
+
+  function openAddTransaction(type: "income" | "expense" = "expense") {
+    setFormData((prev) => ({ ...prev, type, amount: "", note: "", asset_id: "", income_source: "" }));
+    setIsAddOpen(true);
   }
 
   async function addTransaction() {
@@ -346,9 +360,17 @@ export default function TransactionsContent() {
             Manage and review all your financial transactions
           </p>
         </div>
-        <Badge variant="secondary" className="w-fit">
-          {filteredTransactions.length} records
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={() => openAddTransaction("income")} className="bg-emerald-600 hover:bg-emerald-500">
+            Add Income
+          </Button>
+          <Button variant="outline" onClick={() => openAddTransaction("expense")}>
+            Add Expense
+          </Button>
+          <Badge variant="secondary" className="w-fit">
+            {filteredTransactions.length} records
+          </Badge>
+        </div>
       </div>
 
       <Card>
@@ -443,6 +465,15 @@ export default function TransactionsContent() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{formData.type === "income" ? "Add Income" : "Add Expense"}</DialogTitle>
+          </DialogHeader>
+          <TransactionForm onSubmit={addTransaction} submitLabel={formData.type === "income" ? "Save Income" : "Save Expense"} />
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent>

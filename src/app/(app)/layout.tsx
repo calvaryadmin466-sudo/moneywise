@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   FilePlus,
   LayoutDashboard,
@@ -41,6 +41,82 @@ import { MobileNav } from "@/components/mobile-nav";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase, getUser } from "@/lib/supabase";
 import { Transaction } from "@/lib/nhost";
+
+function SidebarNavigation({ pathname }: { pathname: string }) {
+  const searchParams = useSearchParams();
+  const isIncomeActive = pathname.startsWith('/transactions') && searchParams.get('type') === 'income';
+
+  return (
+    <nav className="flex-1 px-2 py-4 space-y-1">
+      <Link href="/dashboard" className={pathname === '/dashboard' ? 'block' : 'block'}>
+        <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/dashboard') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
+          <LayoutDashboard className="h-5 w-5" />
+          <span className="font-medium">Dashboard</span>
+        </div>
+      </Link>
+      <Link href="/transactions" className="block">
+        <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/transactions') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
+          <Receipt className="h-5 w-5" />
+          <span className="font-medium">Transactions</span>
+        </div>
+      </Link>
+      <Link href="/transactions?type=income" className="block">
+        <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${isIncomeActive ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
+          <TrendingUp className="h-5 w-5" />
+          <span className="font-medium">Income</span>
+        </div>
+      </Link>
+      <Link href="/budgets" className="block">
+        <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/budgets') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
+          <Wallet className="h-5 w-5" />
+          <span className="font-medium">Budgets</span>
+        </div>
+      </Link>
+      <Link href="/goals" className="block">
+        <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/goals') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
+          <Target className="h-5 w-5" />
+          <span className="font-medium">Goals</span>
+        </div>
+      </Link>
+      <Link href="/debts" className="block">
+        <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/debts') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
+          <PiggyBank className="h-5 w-5" />
+          <span className="font-medium">Debts</span>
+        </div>
+      </Link>
+      <Link href="/reports" className="block">
+        <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/reports') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
+          <AreaChart className="h-5 w-5" />
+          <span className="font-medium">Reports</span>
+        </div>
+      </Link>
+      <Link href="/settings" className="block">
+        <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/settings') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
+          <Cog className="h-5 w-5" />
+          <span className="font-medium">Settings</span>
+        </div>
+      </Link>
+      <Link href="/profile" className="block">
+        <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/profile') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
+          <User className="h-5 w-5" />
+          <span className="font-medium">Profile</span>
+        </div>
+      </Link>
+      <Link href="/assets" className="block">
+        <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/assets') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
+          <Coins className="h-5 w-5" />
+          <span className="font-medium">Assets</span>
+        </div>
+      </Link>
+      <Link href="/data" className="block">
+        <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/data') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
+          <Database className="h-5 w-5" />
+          <span className="font-medium">My Data</span>
+        </div>
+      </Link>
+    </nav>
+  );
+}
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -135,74 +211,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           </SidebarHeader>
-          <nav className="flex-1 px-2 py-4 space-y-1">
-            <Link href="/dashboard" className={pathname === '/dashboard' ? 'block' : 'block'}>
-              <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/dashboard') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
-                <LayoutDashboard className="h-5 w-5" />
-                <span className="font-medium">Dashboard</span>
-              </div>
-            </Link>
-            <Link href="/transactions" className="block">
-              <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/transactions') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
-                <Receipt className="h-5 w-5" />
-                <span className="font-medium">Transactions</span>
-              </div>
-            </Link>
-            <Link href="/transactions?type=income" className="block">
-              <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/transactions') && pathname.includes('type=income') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
-                <TrendingUp className="h-5 w-5" />
-                <span className="font-medium">Income</span>
-              </div>
-            </Link>
-            <Link href="/budgets" className="block">
-              <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/budgets') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
-                <Wallet className="h-5 w-5" />
-                <span className="font-medium">Budgets</span>
-              </div>
-            </Link>
-            <Link href="/goals" className="block">
-              <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/goals') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
-                <Target className="h-5 w-5" />
-                <span className="font-medium">Goals</span>
-              </div>
-            </Link>
-            <Link href="/debts" className="block">
-              <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/debts') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
-                <PiggyBank className="h-5 w-5" />
-                <span className="font-medium">Debts</span>
-              </div>
-            </Link>
-            <Link href="/reports" className="block">
-              <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/reports') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
-                <AreaChart className="h-5 w-5" />
-                <span className="font-medium">Reports</span>
-              </div>
-            </Link>
-            <Link href="/settings" className="block">
-              <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/settings') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
-                <Cog className="h-5 w-5" />
-                <span className="font-medium">Settings</span>
-              </div>
-            </Link>
-            <Link href="/profile" className="block">
-              <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/profile') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
-                <User className="h-5 w-5" />
-                <span className="font-medium">Profile</span>
-              </div>
-            </Link>
-            <Link href="/assets" className="block">
-              <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/assets') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
-                <Coins className="h-5 w-5" />
-                <span className="font-medium">Assets</span>
-              </div>
-            </Link>
-            <Link href="/data" className="block">
-              <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/data') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
-                <Database className="h-5 w-5" />
-                <span className="font-medium">My Data</span>
-              </div>
-            </Link>
-          </nav>
+          <React.Suspense fallback={null}>
+            <SidebarNavigation pathname={pathname} />
+          </React.Suspense>
         </SidebarContent>
         <SidebarFooter className="border-t border-white/10 p-4">
           <button
