@@ -223,14 +223,14 @@ export default function TransactionsContent() {
         <div className="space-y-2">
           <Label>Link to Asset (Optional)</Label>
           <Select
-            value={formData.asset_id}
-            onValueChange={(v: string) => setFormData({ ...formData, asset_id: v })}
+            value={formData.asset_id || "none"}
+            onValueChange={(v: string) => setFormData({ ...formData, asset_id: v === "none" ? "" : v })}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select asset to update..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">No asset (transaction only)</SelectItem>
+              <SelectItem value="none">No asset (transaction only)</SelectItem>
               {assets.map((asset) => (
                 <SelectItem key={asset.id} value={asset.id}>
                   {asset.name} ({asset.type}) - {asset.currency} {parseFloat(asset.balance).toLocaleString()}
