@@ -129,6 +129,37 @@ export default function AssetsContent() {
     loadDsePrices();
   }, []);
 
+  // Keep stored balances for DSE-linked stocks in step with the live price,
+  // so net worth stays correct on this page and everywhere else that reads `balance`.
+  React.useEffect(() => {
+    if (dsePrices.length === 0 || assets.length === 0) return;
+
+    const drifted = assets.filter((a) => {
+      if (!a.ticker) return false;
+      const price = getDsePrice(a.ticker);
+      if (!price) return false;
+      const liveValue = (Number(a.shares) || 0) * price.price;
+      return Math.round(liveValue) !== Math.round(Number(a.balance));
+    });
+    if (drifted.length === 0) return;
+
+    (async () => {
+      const user = await getUser();
+      if (!user) return;
+      for (const asset of drifted) {
+        const price = getDsePrice(asset.ticker);
+        if (!price) continue;
+        const liveValue = (Number(asset.shares) || 0) * price.price;
+        await supabase
+          .from('user_assets')
+          .update({ balance: liveValue, updated_at: new Date().toISOString() })
+          .eq('id', asset.id)
+          .eq('user_id', user.id);
+      }
+      loadAssets();
+    })();
+  }, [dsePrices, assets]);
+
   async function loadDsePrices() {
     setLoadingPrices(true);
     try {
@@ -359,8 +390,40 @@ export default function AssetsContent() {
       return;
     }
 
-    const newBalance = updateType === 'add' 
-      ? updateAsset.balance + amount 
+    if (updateAsset.ticker) {
+      const currentShares = Number(updateAsset.shares) || 0;
+      const newShares = updateType === 'add' ? currentShares + amount : currentShares - amount;
+
+      if (newShares < 0) {
+        toast({ title: "Error", description: "Not enough shares to sell", variant: "destructive" });
+        return;
+      }
+
+      const price = getDsePrice(updateAsset.ticker);
+      const newBalance = price ? newShares * price.price : updateAsset.balance;
+
+      const { error } = await supabase
+        .from('user_assets')
+        .update({ shares: newShares, balance: newBalance, updated_at: new Date().toISOString() })
+        .eq('id', updateAsset.id)
+        .eq('user_id', user.id);
+
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      } else {
+        toast({
+          title: "Success",
+          description: `${updateType === 'add' ? 'Bought' : 'Sold'} ${amount} shares of ${updateAsset.ticker}`,
+        });
+        setShowUpdateDialog(false);
+        setUpdateAmount('');
+        loadAssets();
+      }
+      return;
+    }
+
+    const newBalance = updateType === 'add'
+      ? updateAsset.balance + amount
       : updateAsset.balance - amount;
 
     if (newBalance < 0) {
@@ -414,7 +477,15 @@ export default function AssetsContent() {
     }
   }
 
-  const totalBalance = assets.reduce((sum, asset) => sum + asset.balance, 0);
+  function getDisplayBalance(asset: Asset): number {
+    if (asset.ticker) {
+      const price = getDsePrice(asset.ticker);
+      if (price) return (Number(asset.shares) || 0) * price.price;
+    }
+    return Number(asset.balance);
+  }
+
+  const totalBalance = assets.reduce((sum, asset) => sum + getDisplayBalance(asset), 0);
 
   function getAssetTypeConfig(type: string) {
     return ASSET_TYPES.find(t => t.value === type) || ASSET_TYPES[4];
@@ -810,7 +881,7 @@ export default function AssetsContent() {
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-xl font-bold text-white">
-                          {asset.currency} {asset.balance.toLocaleString()}
+                          {asset.currency} {getDisplayBalance(asset).toLocaleString()}
                         </p>
                         {isCreditCard && creditLimit > 0 && (
                           <p className={`text-xs mt-0.5 ${utilStatus}`}>
@@ -827,10 +898,10 @@ export default function AssetsContent() {
                               setShowUpdateDialog(true);
                             }}
                             className="h-8 px-2 text-green-400 hover:text-green-300 hover:bg-green-500/10"
-                            title={isCreditCard ? 'Make payment (reduce owed)' : 'Add money'}
+                            title={asset.ticker ? 'Buy shares' : isCreditCard ? 'Make payment (reduce owed)' : 'Add money'}
                           >
                             <ArrowDownLeft className="h-4 w-4 mr-1" />
-                            {isCreditCard ? 'Pay' : 'Add'}
+                            {asset.ticker ? 'Buy' : isCreditCard ? 'Pay' : 'Add'}
                           </Button>
                           <Button
                             size="sm"
@@ -841,10 +912,10 @@ export default function AssetsContent() {
                               setShowUpdateDialog(true);
                             }}
                             className="h-8 px-2 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
-                            title={isCreditCard ? 'Make purchase (increase owed)' : 'Use money'}
+                            title={asset.ticker ? 'Sell shares' : isCreditCard ? 'Make purchase (increase owed)' : 'Use money'}
                           >
                             <ArrowUpRight className="h-4 w-4 mr-1" />
-                            {isCreditCard ? 'Charge' : 'Use'}
+                            {asset.ticker ? 'Sell' : isCreditCard ? 'Charge' : 'Use'}
                           </Button>
                           <Button
                             size="sm"
@@ -906,21 +977,25 @@ export default function AssetsContent() {
           <DialogContent className="bg-[#1e293b] border-white/10 text-white">
             <DialogHeader>
               <DialogTitle>
-                {updateType === 'add' ? 'Add Money' : 'Use Money'} - {updateAsset?.name}
+                {updateAsset?.ticker
+                  ? `${updateType === 'add' ? 'Buy' : 'Sell'} ${updateAsset.ticker} Shares`
+                  : `${updateType === 'add' ? 'Add Money' : 'Use Money'}`} - {updateAsset?.name}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-4">
               <div className="flex items-center justify-center gap-4 p-4 bg-[#0f172a] rounded-lg">
                 <div className="text-center">
-                  <p className="text-sm text-gray-400">Current Balance</p>
+                  <p className="text-sm text-gray-400">{updateAsset?.ticker ? 'Current Shares' : 'Current Balance'}</p>
                   <p className="text-xl font-bold text-white">
-                    {updateAsset?.currency} {updateAsset?.balance.toLocaleString()}
+                    {updateAsset?.ticker
+                      ? (Number(updateAsset.shares) || 0).toLocaleString()
+                      : `${updateAsset?.currency} ${updateAsset?.balance.toLocaleString()}`}
                   </p>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label>Amount to {updateType === 'add' ? 'Add' : 'Use'}</Label>
+                <Label>{updateAsset?.ticker ? `Shares to ${updateType === 'add' ? 'Buy' : 'Sell'}` : `Amount to ${updateType === 'add' ? 'Add' : 'Use'}`}</Label>
                 <Input
                   type="text"
                   value={updateAmount}
@@ -928,7 +1003,7 @@ export default function AssetsContent() {
                     const value = e.target.value.replace(/[^0-9.]/g, '');
                     setUpdateAmount(value);
                   }}
-                  placeholder="0.00"
+                  placeholder={updateAsset?.ticker ? 'e.g., 100' : '0.00'}
                   className="bg-[#0f172a] border-white/20 text-white text-lg min-w-[200px]"
                   style={{ fontSize: '1.125rem', padding: '0.75rem' }}
                   autoFocus
@@ -942,7 +1017,7 @@ export default function AssetsContent() {
                   className={`flex-1 ${updateType === 'add' ? 'bg-green-500/20 border-green-500/50 text-green-400' : 'border-white/20 text-gray-400'}`}
                 >
                   <ArrowDownLeft className="h-4 w-4 mr-2" />
-                  Received
+                  {updateAsset?.ticker ? 'Buy' : 'Received'}
                 </Button>
                 <Button
                   variant="outline"
@@ -950,15 +1025,17 @@ export default function AssetsContent() {
                   className={`flex-1 ${updateType === 'subtract' ? 'bg-amber-500/20 border-amber-500/50 text-amber-400' : 'border-white/20 text-gray-400'}`}
                 >
                   <ArrowUpRight className="h-4 w-4 mr-2" />
-                  Used
+                  {updateAsset?.ticker ? 'Sell' : 'Used'}
                 </Button>
               </div>
 
-              <Button 
-                onClick={handleUpdateBalance} 
+              <Button
+                onClick={handleUpdateBalance}
                 className={`w-full ${updateType === 'add' ? 'bg-green-600 hover:bg-green-500' : 'bg-amber-600 hover:bg-amber-500'}`}
               >
-                {updateType === 'add' ? 'Add Money' : 'Subtract Money'}
+                {updateAsset?.ticker
+                  ? (updateType === 'add' ? 'Buy Shares' : 'Sell Shares')
+                  : (updateType === 'add' ? 'Add Money' : 'Subtract Money')}
               </Button>
             </div>
           </DialogContent>
