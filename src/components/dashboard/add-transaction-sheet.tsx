@@ -6,8 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { supabase, getUser } from "@/lib/supabase";
-import { CATEGORIES } from "@/lib/nhost";
-import type { Transaction } from "@/lib/nhost";
+import { CATEGORIES } from "@/lib/finance";
+import type { Transaction } from "@/lib/finance";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {

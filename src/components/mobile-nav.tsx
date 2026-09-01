@@ -11,7 +11,8 @@ import {
   Target, 
   Receipt, 
   User,
-  Plus
+  Plus,
+  CalendarClock,
 } from "lucide-react";
 
 const navItems = [
@@ -119,6 +120,19 @@ export function MobileNav() {
                 <div>
                   <p className="font-medium text-white">Goal</p>
                   <p className="text-xs text-gray-400">Create savings goal</p>
+                </div>
+              </Link>
+              <Link
+                href="/bills"
+                onClick={() => setShowAddMenu(false)}
+                className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-full bg-sky-500/20 flex items-center justify-center">
+                  <CalendarClock className="h-5 w-5 text-sky-400" />
+                </div>
+                <div>
+                  <p className="font-medium text-white">Bill reminder</p>
+                  <p className="text-xs text-gray-400">Schedule payments</p>
                 </div>
               </Link>
             </div>

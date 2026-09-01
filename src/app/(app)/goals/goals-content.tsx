@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { supabase, getUser } from "@/lib/supabase";
-import { formatCurrency, Currency, Goal, buildFinancialPlan } from "@/lib/nhost";
+import { formatCurrency, Currency, Goal, buildFinancialPlan } from "@/lib/finance";
 import { useSearchParams } from "next/navigation";
 
 export default function GoalsContent() {

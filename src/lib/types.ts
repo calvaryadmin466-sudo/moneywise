@@ -4,6 +4,7 @@
 export enum AssetType {
   CASH = 'cash',
   BANK_ACCOUNT = 'bank_account',
+  CREDIT_CARD = 'credit_card',
   MOBILE_MONEY = 'mobile_money',
   STOCKS = 'stocks',
   BONDS = 'bonds',
@@ -19,6 +20,7 @@ export enum AssetType {
 export const AssetTypeConfig: Record<AssetType, { label: string; icon: string; color: string }> = {
   [AssetType.CASH]: { label: 'Cash', icon: 'Banknote', color: '#2dd4bf' },
   [AssetType.BANK_ACCOUNT]: { label: 'Bank Account', icon: 'Building2', color: '#60a5fa' },
+  [AssetType.CREDIT_CARD]: { label: 'Credit Card', icon: 'CreditCard', color: '#f472b6' },
   [AssetType.MOBILE_MONEY]: { label: 'Mobile Money', icon: 'Smartphone', color: '#34d399' },
   [AssetType.STOCKS]: { label: 'Stocks & Shares', icon: 'TrendingUp', color: '#d4a843' },
   [AssetType.BONDS]: { label: 'Bonds', icon: 'FileText', color: '#a78bfa' },

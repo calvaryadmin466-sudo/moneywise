@@ -20,7 +20,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { formatCurrency, Transaction, Budget, Goal } from "@/lib/nhost";
+import { formatCurrency, Transaction, Budget, Goal } from "@/lib/finance";
 import { supabase, getUser } from "@/lib/supabase";
 import { StockData, getStocksForCountry, getMarketStatus, getLastUpdatedTime } from "@/lib/stocks";
 

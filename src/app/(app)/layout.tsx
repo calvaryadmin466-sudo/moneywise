@@ -19,6 +19,11 @@ import {
   Database,
   Coins,
   TrendingUp,
+  Bell,
+  CalendarDays,
+  CalendarClock,
+  AlertTriangle,
+  CheckCircle2,
 } from "lucide-react";
 import {
   SidebarProvider,
@@ -39,8 +44,25 @@ import { SpendingInsightsDialog } from "@/components/dashboard/spending-insights
 import { AIFinancialAdvisorPro } from "@/components/dashboard/ai-financial-advisor-v2";
 import { MobileNav } from "@/components/mobile-nav";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { supabase, getUser } from "@/lib/supabase";
-import { Transaction } from "@/lib/nhost";
+import { Transaction, formatCurrency, Currency } from "@/lib/finance";
+import {
+  BillReminder,
+  daysUntil,
+  getBillStatus,
+  isDueSoon,
+  isOverdue,
+  computeNextDue,
+} from "@/lib/bills";
+import { useToast } from "@/hooks/use-toast";
 
 function SidebarNavigation({ pathname }: { pathname: string }) {
   const searchParams = useSearchParams();
@@ -72,6 +94,12 @@ function SidebarNavigation({ pathname }: { pathname: string }) {
           <span className="font-medium">Budgets</span>
         </div>
       </Link>
+      <Link href="/bills" className="block">
+        <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/bills') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
+          <CalendarClock className="h-5 w-5" />
+          <span className="font-medium">Bills</span>
+        </div>
+      </Link>
       <Link href="/goals" className="block">
         <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/goals') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
           <Target className="h-5 w-5" />
@@ -90,6 +118,12 @@ function SidebarNavigation({ pathname }: { pathname: string }) {
           <span className="font-medium">Reports</span>
         </div>
       </Link>
+      <Link href="/assets" className="block">
+        <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/assets') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
+          <Coins className="h-5 w-5" />
+          <span className="font-medium">Assets</span>
+        </div>
+      </Link>
       <Link href="/settings" className="block">
         <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/settings') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
           <Cog className="h-5 w-5" />
@@ -102,12 +136,6 @@ function SidebarNavigation({ pathname }: { pathname: string }) {
           <span className="font-medium">Profile</span>
         </div>
       </Link>
-      <Link href="/assets" className="block">
-        <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/assets') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
-          <Coins className="h-5 w-5" />
-          <span className="font-medium">Assets</span>
-        </div>
-      </Link>
       <Link href="/data" className="block">
         <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${pathname.startsWith('/data') ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'}`}>
           <Database className="h-5 w-5" />
@@ -115,6 +143,146 @@ function SidebarNavigation({ pathname }: { pathname: string }) {
         </div>
       </Link>
     </nav>
+  );
+}
+
+function NotificationBellPopover() {
+  const { toast } = useToast();
+  const [bills, setBills] = React.useState<BillReminder[]>([]);
+  const [open, setOpen] = React.useState(false);
+  const searchParams = useSearchParams();
+  const currency = (searchParams.get("currency") as Currency) || "TZS";
+
+  async function refresh() {
+    const user = await getUser();
+    const userId = user?.id;
+    if (!userId) return;
+    const { data } = await supabase
+      .from("bill_reminders")
+      .select("*")
+      .eq("user_id", userId)
+      .order("next_due_date", { ascending: true })
+      .limit(25);
+    if (data) setBills(data);
+  }
+
+  React.useEffect(() => {
+    refresh();
+    const interval = setInterval(refresh, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const critical = bills.filter((b) => isOverdue(b.next_due_date) || isDueSoon(b.next_due_date, b.remind_days_before || 3));
+  const visible = critical.slice(0, 8);
+
+  async function markPaid(bill: BillReminder) {
+    const user = await getUser();
+    if (!user) return;
+    const nextDue = bill.recurrence === "once" ? bill.next_due_date : computeNextDue(bill.next_due_date, bill.recurrence);
+    const { error } = await supabase
+      .from("bill_reminders")
+      .update({ next_due_date: nextDue, is_paid_last: true, last_notified_at: null, snooze_until: null })
+      .eq("id", bill.id);
+    if (!error) {
+      toast({ title: "Marked paid" });
+      refresh();
+    }
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="icon" className="relative text-gray-300 hover:text-white hover:bg-white/5">
+          <Bell className="h-5 w-5" />
+          {critical.length > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full bg-rose-500 text-[10px] font-semibold text-white flex items-center justify-center px-1 shadow-[0_0_10px_rgba(244,63,94,0.5)]">
+              {critical.length > 9 ? "9+" : critical.length}
+            </span>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-[380px] p-0 border-white/10 bg-[#0f172a]/95 backdrop-blur-xl">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-cyan-400" />
+            <p className="text-sm font-semibold">Upcoming bills</p>
+          </div>
+          <Badge variant="secondary" className="text-[10px] h-5">
+            {critical.length} need attention
+          </Badge>
+        </div>
+        <ScrollArea className="max-h-[360px]">
+          {visible.length === 0 ? (
+            <div className="py-10 px-4 text-center">
+              <CheckCircle2 className="h-8 w-8 text-emerald-400 mx-auto mb-2" />
+              <p className="text-sm text-gray-300">All caught up</p>
+              <p className="text-xs text-muted-foreground mt-1">No upcoming bills to worry about</p>
+            </div>
+          ) : (
+            <div className="py-2">
+              {visible.map((bill) => {
+                const status = getBillStatus(bill);
+                const days = daysUntil(bill.next_due_date);
+                return (
+                  <div
+                    key={bill.id}
+                    className={`flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors ${
+                      status === "overdue" ? "bg-rose-500/5" : ""
+                    }`}
+                  >
+                    <div
+                      className={`h-9 w-9 shrink-0 rounded-lg flex items-center justify-center ${
+                        status === "overdue"
+                          ? "bg-rose-500/15 text-rose-400"
+                          : status === "due-soon"
+                          ? "bg-amber-500/15 text-amber-400"
+                          : "bg-cyan-500/15 text-cyan-400"
+                      }`}
+                    >
+                      {status === "overdue" ? (
+                        <AlertTriangle className="h-4 w-4" />
+                      ) : (
+                        <CalendarClock className="h-4 w-4" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{bill.title}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {days < 0
+                          ? `${Math.abs(days)}d overdue`
+                          : days === 0
+                          ? "Due today"
+                          : `in ${days}d`}
+                        {" • "}
+                        {bill.next_due_date}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-semibold">{formatCurrency(Number(bill.amount), currency)}</p>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-2 mt-0.5 text-[11px] text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
+                        onClick={() => markPaid(bill)}
+                      >
+                        <CheckCircle2 className="h-3 w-3 mr-1" /> Paid
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </ScrollArea>
+        <div className="border-t border-white/10 p-3">
+          <Link href="/bills" onClick={() => setOpen(false)}>
+            <Button variant="outline" className="w-full h-9 border-white/10 text-gray-300 hover:bg-white/5">
+              View all reminders
+            </Button>
+          </Link>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -283,6 +451,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <h1 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">{capitalizedTitle}</h1>
           </div>
           <div className="flex items-center gap-3">
+            <NotificationBellPopover />
             <AIFinancialAdvisorPro />
           </div>
         </header>

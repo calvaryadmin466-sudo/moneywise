@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase, getUser } from "@/lib/supabase";
-import { formatCurrency, Currency, Debt } from "@/lib/nhost";
+import { formatCurrency, Currency, Debt } from "@/lib/finance";
 import { useSearchParams } from "next/navigation";
 
 export default function DebtsContent() {

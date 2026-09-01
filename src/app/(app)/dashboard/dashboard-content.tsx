@@ -16,9 +16,19 @@ import {
   AlertCircle,
   Lightbulb,
   Bell,
+  BellRing,
+  BellOff,
   Calendar,
   CheckCircle2,
-  Target
+  Target,
+  CalendarClock,
+  CalendarDays,
+  AlertTriangle,
+  SkipForward,
+  Edit2,
+  Trash2,
+  CreditCard,
+  Plus,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -27,15 +37,27 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import Link from "next/link";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase, getUser } from "@/lib/supabase";
-import { formatCurrency, Currency, Transaction, Budget, Goal, CATEGORIES } from "@/lib/nhost";
+import { formatCurrency, Currency, Transaction, Budget, Goal, CATEGORIES, Asset } from "@/lib/finance";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FinancialTips } from "@/components/dashboard/financial-tips";
+import {
+  BillReminder,
+  RECURRENCE_OPTIONS,
+  computeNextDue,
+  daysUntil,
+  getBillStatus,
+  isDueSoon,
+  isOverdue,
+} from "@/lib/bills";
+import { useToast } from "@/hooks/use-toast";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 export default function DashboardContent() {
+  const { toast } = useToast();
   const searchParams = useSearchParams();
   const router = useRouter();
   const currency = (searchParams.get("currency") as Currency) || "TZS";
@@ -44,6 +66,7 @@ export default function DashboardContent() {
   const [budgets, setBudgets] = React.useState<Budget[]>([]);
   const [goals, setGoals] = React.useState<Goal[]>([]);
   const [assets, setAssets] = React.useState<{ id?: string; name?: string; type?: string; balance: number; currency?: string; asset_type?: string }[]>([]);
+  const [bills, setBills] = React.useState<BillReminder[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [showCheckIn, setShowCheckIn] = React.useState(false);
   const [checkInAmount, setCheckInAmount] = React.useState("");
@@ -65,14 +88,16 @@ export default function DashboardContent() {
         setBudgets([]);
         setGoals([]);
         setAssets([]);
+        setBills([]);
         setLoading(false);
         return;
       }
-      const [transRes, budgetRes, goalsRes, assetsRes] = await Promise.all([
+      const [transRes, budgetRes, goalsRes, assetsRes, billsRes] = await Promise.all([
         supabase.from('transactions').select('id, user_id, type, amount, category, date, note, is_recurring, created_at').eq('user_id', userId).order('date', { ascending: false }),
         supabase.from('budgets').select('id, user_id, category, monthly_limit, month, created_at').eq('user_id', userId),
         supabase.from('goals').select('id, user_id, name, target_amount, saved_amount, deadline, created_at').eq('user_id', userId).order('created_at', { ascending: false }),
         supabase.from('user_assets').select('id, name, type, balance, currency').eq('user_id', userId),
+        supabase.from('bill_reminders').select('*').eq('user_id', userId).order('next_due_date', { ascending: true }).limit(10),
       ]);
 
       if (transRes.error) throw transRes.error;
@@ -80,18 +105,58 @@ export default function DashboardContent() {
       if (goalsRes.error) throw goalsRes.error;
       if (assetsRes.error) throw assetsRes.error;
 
-      setTransactions(transRes.data || []);
+      setTransactions((transRes.data || []) as Transaction[]);
       setBudgets(budgetRes.data || []);
       setGoals(goalsRes.data || []);
-      setAssets(assetsRes.data || []);
+      setAssets((assetsRes.data || []) as Asset[]);
+      setBills((billsRes.data as BillReminder[]) || []);
     } catch (error) {
       console.error('Dashboard fetch error:', error);
       setTransactions([]);
       setBudgets([]);
       setGoals([]);
       setAssets([]);
+      setBills([]);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function markBillPaid(bill: BillReminder) {
+    const user = await getUser();
+    if (!user) return;
+
+    if (bill.asset_id) {
+      const asset = assets.find((a) => (a as any).id === bill.asset_id);
+      if (asset) {
+        const { error: txErr } = await supabase.from("transactions").insert({
+          user_id: user.id,
+          type: "expense",
+          amount: Number(bill.amount),
+          category: bill.category || "Other",
+          date: new Date().toISOString().slice(0, 10),
+          note: `Bill payment: ${bill.title}`,
+          is_recurring: false,
+          asset_id: bill.asset_id,
+        });
+        if (!txErr) {
+          const newBalance = Number(asset.balance) - Number(bill.amount);
+          await supabase
+            .from("user_assets")
+            .update({ balance: newBalance, updated_at: new Date().toISOString() })
+            .eq("id", (asset as any).id);
+        }
+      }
+    }
+
+    const nextDue = bill.recurrence === "once" ? bill.next_due_date : computeNextDue(bill.next_due_date, bill.recurrence);
+    const { error } = await supabase
+      .from("bill_reminders")
+      .update({ next_due_date: nextDue, is_paid_last: true, last_notified_at: null, snooze_until: null })
+      .eq("id", bill.id);
+    if (!error) {
+      toast({ title: "Marked paid" });
+      fetchData();
     }
   }
 
@@ -175,6 +240,22 @@ export default function DashboardContent() {
   }, [monthlyTransactions]);
 
   const totalSpending = Object.values(spendingByCategory).reduce((a, b) => a + b, 0);
+
+  const billsStats = React.useMemo(() => {
+    const monthKey = new Date().toISOString().slice(0, 7);
+    const monthBills = bills.filter((b) => b.next_due_date.startsWith(monthKey));
+    return {
+      totalDue: monthBills.reduce((s, b) => s + Number(b.amount), 0),
+      count: monthBills.length,
+      overdueCount: bills.filter((b) => isOverdue(b.next_due_date)).length,
+      dueSoonCount: bills.filter((b) => isDueSoon(b.next_due_date, b.remind_days_before || 3) && !isOverdue(b.next_due_date)).length,
+    };
+  }, [bills]);
+
+  const upcomingBills = React.useMemo(
+    () => bills.filter((b) => daysUntil(b.next_due_date) <= 30).slice(0, 5),
+    [bills]
+  );
 
   const doughnutData = {
     labels: Object.keys(spendingByCategory),
@@ -620,6 +701,201 @@ export default function DashboardContent() {
         </Card>
 
         <FinancialTips />
+      </div>
+
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+        <Card className="glass-card border-sky-500/20 lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-sky-400">
+                <CalendarClock className="h-5 w-5" />
+                Upcoming bills
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Next 30 days — {billsStats.count} scheduled, total{" "}
+                {formatCurrency(billsStats.totalDue, currency)}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {billsStats.overdueCount > 0 && (
+                <Badge className="bg-rose-500/20 text-rose-400 border-rose-500/30">
+                  {billsStats.overdueCount} overdue
+                </Badge>
+              )}
+              {billsStats.dueSoonCount > 0 && (
+                <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">
+                  {billsStats.dueSoonCount} due soon
+                </Badge>
+              )}
+              <Link href="/bills">
+                <Button variant="outline" size="sm" className="h-8 border-white/10 text-gray-300 hover:bg-white/5">
+                  View all
+                </Button>
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {upcomingBills.length === 0 ? (
+              <div className="py-10 text-center">
+                <CalendarDays className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+                <p className="font-medium text-gray-300">No upcoming bills</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Schedule reminders to never miss a payment
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {upcomingBills.map((bill) => {
+                  const status = getBillStatus(bill);
+                  const days = daysUntil(bill.next_due_date);
+                  return (
+                    <div
+                      key={bill.id}
+                      className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${
+                        status === "overdue"
+                          ? "bg-rose-500/5 border border-rose-500/20"
+                          : status === "due-soon"
+                          ? "bg-amber-500/5 border border-amber-500/20"
+                          : "bg-white/5 border border-white/10 hover:bg-white/10"
+                      }`}
+                    >
+                      <div
+                        className={`h-10 w-10 shrink-0 rounded-lg flex items-center justify-center ${
+                          status === "overdue"
+                            ? "bg-rose-500/15 text-rose-400"
+                            : status === "due-soon"
+                            ? "bg-amber-500/15 text-amber-400"
+                            : status === "snoozed"
+                            ? "bg-slate-500/15 text-slate-400"
+                            : "bg-sky-500/15 text-sky-400"
+                        }`}
+                      >
+                        {status === "overdue" ? (
+                          <AlertTriangle className="h-4 w-4" />
+                        ) : status === "snoozed" ? (
+                          <BellOff className="h-4 w-4" />
+                        ) : (
+                          <CalendarDays className="h-4 w-4" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-medium truncate">{bill.title}</h4>
+                          {bill.recurrence !== "once" && (
+                            <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                              {RECURRENCE_OPTIONS.find((r) => r.value === bill.recurrence)?.label}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          {bill.next_due_date} •{" "}
+                          {days < 0
+                            ? `${Math.abs(days)}d overdue`
+                            : days === 0
+                            ? "Due today"
+                            : `in ${days}d`}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right flex items-center gap-3">
+                        <div className="text-sm font-bold">
+                          {formatCurrency(Number(bill.amount), currency)}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 px-3 text-[11px] bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300"
+                          onClick={() => markBillPaid(bill)}
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Mark paid
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="space-y-6">
+          <Card className="glass-card border-cyan-500/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-cyan-400 flex items-center gap-2">
+                <BellRing className="h-4 w-4" /> Bills summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                  <span>This month due</span>
+                  <span>{billsStats.count} items</span>
+                </div>
+                <div className="text-lg font-bold">
+                  {formatCurrency(billsStats.totalDue, currency)}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-300 flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-rose-500" /> Overdue
+                  </span>
+                  <span className="font-semibold text-rose-400">{billsStats.overdueCount}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-300 flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-amber-500" /> Due soon
+                  </span>
+                  <span className="font-semibold text-amber-400">{billsStats.dueSoonCount}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-300 flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" /> Scheduled
+                  </span>
+                  <span className="font-semibold text-emerald-400">
+                    {Math.max(0, billsStats.count - billsStats.overdueCount)}
+                  </span>
+                </div>
+              </div>
+              <Link href="/bills">
+                <Button className="w-full h-9 bg-gradient-to-r from-sky-500 to-cyan-600 text-white">
+                  <Plus className="h-4 w-4 mr-1.5" /> New reminder
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          <Card className="glass-card border-amber-500/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-amber-400 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" /> Pay this week
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {bills
+                .filter((b) => daysUntil(b.next_due_date) >= 0 && daysUntil(b.next_due_date) <= 7)
+                .slice(0, 4)
+                .map((bill) => (
+                  <div key={bill.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="h-7 w-7 shrink-0 rounded-md bg-amber-500/15 text-amber-400 flex items-center justify-center">
+                        <CreditCard className="h-3.5 w-3.5" />
+                      </div>
+                      <span className="text-sm truncate">{bill.title}</span>
+                    </div>
+                    <span className="text-xs font-semibold">
+                      {formatCurrency(Number(bill.amount), currency)}
+                    </span>
+                  </div>
+                ))}
+              {bills.filter((b) => daysUntil(b.next_due_date) >= 0 && daysUntil(b.next_due_date) <= 7)
+                .length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-3">
+                  Nothing urgent this week
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <Card className="glass-card border-emerald-500/20">

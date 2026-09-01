@@ -32,7 +32,19 @@ export function SpendingInsightsDialog({ isOpen, setIsOpen, transactions }: Spen
   const handleGenerateInsights = async () => {
     setIsLoading(true);
     setInsights(null);
-    const result = await getSpendingInsightsAction({ transactions });
+    const mappedTransactions = transactions
+      .filter((t) => t.type === "income" || t.type === "expense")
+      .map((t) => ({
+        id: t.id,
+        category: t.category,
+        type: t.type as "income" | "expense",
+        date: typeof t.date === "string" && !t.date.endsWith("Z") && !t.date.includes("T")
+          ? `${t.date}T00:00:00Z`
+          : String(t.date),
+        amount: Number(t.amount),
+        notes: (t.note ?? undefined) as string | undefined,
+      }));
+    const result = await getSpendingInsightsAction({ transactions: mappedTransactions });
     setIsLoading(false);
 
     if (result.success && result.data) {

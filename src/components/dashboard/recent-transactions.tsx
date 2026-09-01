@@ -80,7 +80,7 @@ export function RecentTransactions({
         const valA = a[sortKey];
         const valB = b[sortKey];
 
-        if (valA === undefined || valB === undefined) return 0;
+        if (valA === undefined || valB === undefined || valA === null || valB === null) return 0;
 
         let comparison = 0;
         if (valA > valB) {
@@ -92,7 +92,11 @@ export function RecentTransactions({
       });
     } else {
       // Default sort by date descending
-      filtered.sort((a, b) => b.date.getTime() - a.date.getTime());
+      filtered.sort((a, b) => {
+        const da = a.date instanceof Date ? a.date : new Date(a.date);
+        const db = b.date instanceof Date ? b.date : new Date(b.date);
+        return db.getTime() - da.getTime();
+      });
     }
 
     return filtered;

@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
+export * from './finance'
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://example.supabase.co'
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key'
 
@@ -104,100 +106,3 @@ export async function getProfile(userId: string) {
   return { data, error }
 }
 
-export type Transaction = {
-  id: string
-  user_id: string
-  type: 'income' | 'expense'
-  amount: number
-  category: string
-  note: string | null
-  date: string
-  is_recurring: boolean
-  asset_id: string | null
-  income_source: string | null
-  created_at: string
-}
-
-export type Budget = {
-  id: string
-  user_id: string
-  category: string
-  monthly_limit: number
-  month: string
-  created_at: string
-}
-
-export type Goal = {
-  id: string
-  user_id: string
-  name: string
-  target_amount: number
-  saved_amount: number
-  deadline: string | null
-  created_at: string
-}
-
-export type Debt = {
-  id: string
-  user_id: string
-  name: string
-  amount: number
-  direction: 'i_owe' | 'they_owe'
-  due_date: string | null
-  is_paid: boolean
-  created_at: string
-}
-
-export type Asset = {
-  id: string
-  user_id: string
-  type: 'cash' | 'bank_account' | 'mobile_money' | 'stocks' | 'bonds' | 'real_estate' | 'vehicle' | 'jewelry' | 'business' | 'livestock' | 'land' | 'other'
-  name: string
-  balance: number
-  currency: string
-  account_number: string | null
-  bank_name: string | null
-  broker_name: string | null
-  description: string | null
-  created_at: string
-  updated_at: string
-}
-
-export type UserProfile = {
-  id: string
-  email: string | null
-  display_name: string | null
-  avatar_url: string | null
-  currency_preference: string
-  country: string
-  phone: string | null
-  created_at: string
-  updated_at: string
-  last_seen: string
-}
-
-export type Currency = 'TZS' | 'USD' | 'KES'
-
-export const CATEGORIES = [
-  'Food',
-  'Transport',
-  'Rent',
-  'Bills',
-  'Health',
-  'Personal',
-  'Education',
-  'Entertainment',
-  'Investment',
-  'Other'
-] as const
-
-export const CURRENCY_SYMBOLS: Record<Currency, string> = {
-  TZS: 'TSh',
-  USD: '$',
-  KES: 'KSh'
-}
-
-export function formatCurrency(amount: number, currency: Currency = 'TZS'): string {
-  const symbol = CURRENCY_SYMBOLS[currency]
-  return `${symbol}${amount.toLocaleString()}`
-}

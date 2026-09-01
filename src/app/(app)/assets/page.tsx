@@ -33,6 +33,8 @@ import {
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 
 interface Asset {
   id: string;
@@ -40,10 +42,13 @@ interface Asset {
   name: string;
   balance: number;
   currency: string;
-  account_number?: string;
-  bank_name?: string;
-  broker_name?: string;
-  description?: string;
+  account_number?: string | null;
+  bank_name?: string | null;
+  broker_name?: string | null;
+  description?: string | null;
+  credit_limit?: number | null;
+  statement_date?: string | null;
+  minimum_payment?: number | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -94,6 +99,20 @@ export default function AssetsPage() {
     bank_name: '',
     broker_name: '',
     description: '',
+    credit_limit: '',
+    statement_date: '',
+    minimum_payment: '',
+    apr: '',
+  });
+
+  const [showTransferDialog, setShowTransferDialog] = React.useState(false);
+  const [transfer, setTransfer] = React.useState({
+    from_asset_id: '',
+    to_asset_id: '',
+    amount: '',
+    date: new Date().toISOString().slice(0, 10),
+    note: '',
+    fee: '',
   });
 
   React.useEffect(() => {
@@ -128,7 +147,6 @@ export default function AssetsPage() {
       return;
     }
 
-    // Insert asset using Supabase
     const { data, error } = await supabase
       .from('user_assets')
       .insert({
@@ -141,6 +159,9 @@ export default function AssetsPage() {
         bank_name: newAsset.bank_name || null,
         broker_name: newAsset.broker_name || null,
         description: newAsset.description || null,
+        credit_limit: newAsset.credit_limit ? parseFloat(newAsset.credit_limit) : null,
+        statement_date: newAsset.statement_date || null,
+        minimum_payment: newAsset.minimum_payment ? parseFloat(newAsset.minimum_payment) : null,
       })
       .select()
       .single();
@@ -166,9 +187,97 @@ export default function AssetsPage() {
         bank_name: '',
         broker_name: '',
         description: '',
+        credit_limit: '',
+        statement_date: '',
+        minimum_payment: '',
+        apr: '',
       });
       loadAssets();
     }
+  }
+
+  async function handleTransfer() {
+    const user = await getUser();
+    if (!user) return;
+
+    if (!transfer.from_asset_id || !transfer.to_asset_id || !transfer.amount) {
+      toast({ title: "Error", description: "Select accounts and enter an amount", variant: "destructive" });
+      return;
+    }
+    if (transfer.from_asset_id === transfer.to_asset_id) {
+      toast({ title: "Error", description: "Select different source and destination accounts", variant: "destructive" });
+      return;
+    }
+
+    const amount = parseFloat(transfer.amount);
+    const fee = parseFloat(transfer.fee) || 0;
+    if (isNaN(amount) || amount <= 0) {
+      toast({ title: "Error", description: "Enter a valid amount", variant: "destructive" });
+      return;
+    }
+
+    const source = assets.find(a => a.id === transfer.from_asset_id);
+    if (!source) return;
+    if (Number(source.balance) < amount + fee) {
+      toast({ title: "Error", description: "Insufficient balance in source account", variant: "destructive" });
+      return;
+    }
+
+    const { data: txData, error: txError } = await supabase.rpc('create_transfer_transactions', {
+      p_user_id: user.id,
+      p_from_asset_id: transfer.from_asset_id,
+      p_to_asset_id: transfer.to_asset_id,
+      p_amount: amount,
+      p_fee: fee,
+      p_date: transfer.date,
+      p_note: transfer.note || null,
+    });
+
+    if (!txError && txData) {
+      toast({ title: "Transfer complete", description: `Moved ${formatCurrencySimple(amount, source.currency)}` });
+      setShowTransferDialog(false);
+      setTransfer({
+        from_asset_id: '',
+        to_asset_id: '',
+        amount: '',
+        date: new Date().toISOString().slice(0, 10),
+        note: '',
+        fee: '',
+      });
+      loadAssets();
+      return;
+    }
+
+    const fallbackSource = Number(source.balance) - amount - fee;
+    const destAsset = assets.find(a => a.id === transfer.to_asset_id);
+    const fallbackDest = Number(destAsset?.balance || 0) + amount;
+
+    const { error: u1 } = await supabase.from('user_assets')
+      .update({ balance: fallbackSource, updated_at: new Date().toISOString() })
+      .eq('id', transfer.from_asset_id).eq('user_id', user.id);
+    const { error: u2 } = await supabase.from('user_assets')
+      .update({ balance: fallbackDest, updated_at: new Date().toISOString() })
+      .eq('id', transfer.to_asset_id).eq('user_id', user.id);
+
+    if (!u1 && !u2) {
+      toast({ title: "Transfer complete (balances updated)", description: `Moved ${formatCurrencySimple(amount, source.currency)}` });
+      setShowTransferDialog(false);
+      setTransfer({
+        from_asset_id: '',
+        to_asset_id: '',
+        amount: '',
+        date: new Date().toISOString().slice(0, 10),
+        note: '',
+        fee: '',
+      });
+      loadAssets();
+    } else {
+      toast({ title: "Transfer failed", description: u1?.message || u2?.message || "Unknown error", variant: "destructive" });
+    }
+  }
+
+  function formatCurrencySimple(amount: number, currency: string) {
+    return `${currency} ${amount.toLocaleString()}`;
   }
 
   async function handleUpdateBalance() {
@@ -341,6 +450,78 @@ export default function AssetsPage() {
                   </div>
                 )}
 
+                {newAsset.type === AssetType.CREDIT_CARD && (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Issuing Bank</Label>
+                        <Input
+                          value={newAsset.bank_name}
+                          onChange={(e) => setNewAsset({ ...newAsset, bank_name: e.target.value })}
+                          placeholder="e.g., Visa, Mastercard, Amex"
+                          className="bg-[#0f172a] border-white/20 text-white"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Last 4 digits / Ref</Label>
+                        <Input
+                          value={newAsset.account_number}
+                          onChange={(e) => setNewAsset({ ...newAsset, account_number: e.target.value })}
+                          placeholder="e.g., ****-4521"
+                          className="bg-[#0f172a] border-white/20 text-white"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Credit Limit</Label>
+                        <Input
+                          type="text"
+                          value={newAsset.credit_limit}
+                          onChange={(e) => setNewAsset({ ...newAsset, credit_limit: e.target.value.replace(/[^0-9.]/g, '') })}
+                          placeholder="0.00"
+                          className="bg-[#0f172a] border-white/20 text-white"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>APR % (Optional)</Label>
+                        <Input
+                          type="text"
+                          value={newAsset.apr}
+                          onChange={(e) => setNewAsset({ ...newAsset, apr: e.target.value.replace(/[^0-9.]/g, '') })}
+                          placeholder="e.g., 24.9"
+                          className="bg-[#0f172a] border-white/20 text-white"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Next Statement Date</Label>
+                        <Input
+                          type="date"
+                          value={newAsset.statement_date}
+                          onChange={(e) => setNewAsset({ ...newAsset, statement_date: e.target.value })}
+                          className="bg-[#0f172a] border-white/20 text-white"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Minimum Payment</Label>
+                        <Input
+                          type="text"
+                          value={newAsset.minimum_payment}
+                          onChange={(e) => setNewAsset({ ...newAsset, minimum_payment: e.target.value.replace(/[^0-9.]/g, '') })}
+                          placeholder="0.00"
+                          className="bg-[#0f172a] border-white/20 text-white"
+                        />
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 space-y-1">
+                      <p>💳 Credit card balance should reflect the current amount owed (negative equity).</p>
+                      <p>Set credit limit to track available credit vs utilisation.</p>
+                    </div>
+                  </>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Current Balance</Label>
@@ -370,6 +551,8 @@ export default function AssetsPage() {
                         <SelectItem value="USD">USD</SelectItem>
                         <SelectItem value="KES">KES</SelectItem>
                         <SelectItem value="UGX">UGX</SelectItem>
+                        <SelectItem value="EUR">EUR</SelectItem>
+                        <SelectItem value="GBP">GBP</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -391,6 +574,16 @@ export default function AssetsPage() {
               </div>
             </DialogContent>
           </Dialog>
+
+          <Button
+            variant="outline"
+            onClick={() => setShowTransferDialog(true)}
+            className="border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/10"
+            disabled={assets.length < 2}
+          >
+            <ArrowUpRight className="h-4 w-4 mr-2 rotate-180" />
+            Transfer
+          </Button>
         </div>
 
         {/* Total Card */}
@@ -437,32 +630,51 @@ export default function AssetsPage() {
             {assets.map((asset) => {
               const typeConfig = getAssetTypeConfig(asset.type);
               const Icon = typeConfig.icon;
+              const isCreditCard = asset.type === 'credit_card';
+              const creditLimit = asset.credit_limit ? Number(asset.credit_limit) : 0;
+              const balance = Number(asset.balance);
+              const utilization = creditLimit > 0 ? Math.min((balance / creditLimit) * 100, 100) : 0;
+              const availableCredit = Math.max(creditLimit - balance, 0);
+              const utilStatus = utilization >= 90 ? 'text-rose-400' : utilization >= 70 ? 'text-amber-400' : 'text-emerald-400';
+              const utilBg = utilization >= 90 ? '[&>div]:bg-rose-500' : utilization >= 70 ? '[&>div]:bg-amber-500' : '[&>div]:bg-emerald-500';
               
               return (
-                <Card key={asset.id} className="glass-card hover:border-cyan-500/30 transition-colors">
-                  <CardContent className="p-4">
+                <Card key={asset.id} className={`glass-card hover:border-cyan-500/30 transition-colors ${isCreditCard ? 'border-pink-500/20' : ''}`}>
+                  <CardContent className="p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <div className={`p-3 rounded-xl ${typeConfig.bgColor}`}>
-                          <Icon className={`h-6 w-6 ${typeConfig.color}`} />
+                        <div className={`p-3 rounded-xl ${isCreditCard ? 'bg-pink-500/20' : typeConfig.bgColor}`}>
+                          <Icon className={`h-6 w-6 ${isCreditCard ? 'text-pink-400' : typeConfig.color}`} />
                         </div>
-                        <div>
-                          <h3 className="font-semibold text-white">{asset.name}</h3>
-                          <div className="flex items-center gap-2 text-sm text-gray-400">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-semibold text-white">{asset.name}</h3>
+                            {isCreditCard && (
+                              <Badge className="bg-pink-500/20 text-pink-400 border-pink-500/30 text-[10px] h-5">Credit</Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-gray-400 flex-wrap">
                             <span>{typeConfig.label}</span>
                             {asset.bank_name && <span>• {asset.bank_name}</span>}
                             {asset.account_number && <span>• {asset.account_number}</span>}
                             {asset.broker_name && <span>• {asset.broker_name}</span>}
+                            {isCreditCard && (asset as any).apr && <span>• APR {(asset as any).apr}%</span>}
+                            {isCreditCard && asset.statement_date && <span>• stmt {asset.statement_date}</span>}
                           </div>
                           {asset.description && (
-                            <p className="text-xs text-gray-500 mt-1">{asset.description}</p>
+                            <p className="text-xs text-gray-500 mt-1 truncate">{asset.description}</p>
                           )}
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right shrink-0">
                         <p className="text-xl font-bold text-white">
                           {asset.currency} {asset.balance.toLocaleString()}
                         </p>
+                        {isCreditCard && creditLimit > 0 && (
+                          <p className={`text-xs mt-0.5 ${utilStatus}`}>
+                            {utilization.toFixed(0)}% utilised • avail {formatCurrencySimple(availableCredit, asset.currency)}
+                          </p>
+                        )}
                         <div className="flex items-center gap-1 mt-2">
                           <Button
                             size="sm"
@@ -473,9 +685,10 @@ export default function AssetsPage() {
                               setShowUpdateDialog(true);
                             }}
                             className="h-8 px-2 text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                            title={isCreditCard ? 'Make payment (reduce owed)' : 'Add money'}
                           >
                             <ArrowDownLeft className="h-4 w-4 mr-1" />
-                            Add
+                            {isCreditCard ? 'Pay' : 'Add'}
                           </Button>
                           <Button
                             size="sm"
@@ -486,9 +699,10 @@ export default function AssetsPage() {
                               setShowUpdateDialog(true);
                             }}
                             className="h-8 px-2 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+                            title={isCreditCard ? 'Make purchase (increase owed)' : 'Use money'}
                           >
                             <ArrowUpRight className="h-4 w-4 mr-1" />
-                            Use
+                            {isCreditCard ? 'Charge' : 'Use'}
                           </Button>
                           <Button
                             size="sm"
@@ -501,6 +715,17 @@ export default function AssetsPage() {
                         </div>
                       </div>
                     </div>
+                    {isCreditCard && creditLimit > 0 && (
+                      <div className="pt-1 space-y-1">
+                        <div className="flex justify-between text-[11px] text-gray-400">
+                          <span>Limit {formatCurrencySimple(creditLimit, asset.currency)}</span>
+                          <span>
+                            {asset.minimum_payment ? `Min pay ${formatCurrencySimple(Number(asset.minimum_payment), asset.currency)}` : ''}
+                          </span>
+                        </div>
+                        <Progress value={utilization} className={`h-1.5 ${utilBg}`} />
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               );
@@ -571,6 +796,136 @@ export default function AssetsPage() {
           </DialogContent>
         </Dialog>
 
+        {/* Transfer Dialog */}
+        <Dialog open={showTransferDialog} onOpenChange={setShowTransferDialog}>
+          <DialogContent className="bg-[#1e293b] border-white/10 text-white max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Wallet className="h-5 w-5 text-cyan-400" />
+                Transfer Between Accounts
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-xs text-gray-400">From (Source)</Label>
+                  <Select
+                    value={transfer.from_asset_id}
+                    onValueChange={(v) => setTransfer({ ...transfer, from_asset_id: v })}
+                  >
+                    <SelectTrigger className="bg-[#0f172a] border-white/20 text-white h-11">
+                      <SelectValue placeholder="Select account" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {assets.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name} — {a.currency} {Number(a.balance).toLocaleString()}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-gray-400">To (Destination)</Label>
+                  <Select
+                    value={transfer.to_asset_id}
+                    onValueChange={(v) => setTransfer({ ...transfer, to_asset_id: v })}
+                  >
+                    <SelectTrigger className="bg-[#0f172a] border-white/20 text-white h-11">
+                      <SelectValue placeholder="Select account" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {assets.map((a) => (
+                        <SelectItem key={a.id} value={a.id} disabled={a.id === transfer.from_asset_id}>
+                          {a.name} — {a.currency} {Number(a.balance).toLocaleString()}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-xs text-gray-400">Amount</Label>
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    value={transfer.amount}
+                    onChange={(e) => setTransfer({ ...transfer, amount: e.target.value.replace(/[^0-9.]/g, '') })}
+                    placeholder="0.00"
+                    className="bg-[#0f172a] border-white/20 text-white h-11 text-lg"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-gray-400">Fee (optional)</Label>
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    value={transfer.fee}
+                    onChange={(e) => setTransfer({ ...transfer, fee: e.target.value.replace(/[^0-9.]/g, '') })}
+                    placeholder="0.00"
+                    className="bg-[#0f172a] border-white/20 text-white h-11"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs text-gray-400">Date</Label>
+                <Input
+                  type="date"
+                  value={transfer.date}
+                  onChange={(e) => setTransfer({ ...transfer, date: e.target.value })}
+                  className="bg-[#0f172a] border-white/20 text-white h-11"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs text-gray-400">Note / Memo</Label>
+                <Input
+                  value={transfer.note}
+                  onChange={(e) => setTransfer({ ...transfer, note: e.target.value })}
+                  placeholder="e.g., ATM withdrawal, M-Pesa top-up"
+                  className="bg-[#0f172a] border-white/20 text-white h-11"
+                />
+              </div>
+
+              {transfer.from_asset_id && transfer.to_asset_id && transfer.amount && (
+                <div className="p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-xs space-y-1">
+                  <div className="flex justify-between text-gray-400">
+                    <span>Source after transfer</span>
+                    <span className="text-white">
+                      {(() => {
+                        const src = assets.find(a => a.id === transfer.from_asset_id);
+                        if (!src) return '-';
+                        const amt = parseFloat(transfer.amount) || 0;
+                        const fee = parseFloat(transfer.fee) || 0;
+                        return `${src.currency} ${(Number(src.balance) - amt - fee).toLocaleString()}`;
+                      })()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-gray-400">
+                    <span>Destination after</span>
+                    <span className="text-white">
+                      {(() => {
+                        const dst = assets.find(a => a.id === transfer.to_asset_id);
+                        if (!dst) return '-';
+                        const amt = parseFloat(transfer.amount) || 0;
+                        return `${dst.currency} ${(Number(dst.balance) + amt).toLocaleString()}`;
+                      })()}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <Button onClick={handleTransfer} className="w-full h-11 bg-gradient-to-r from-cyan-500 to-blue-600">
+                <ArrowUpRight className="h-4 w-4 mr-2 rotate-180" />
+                Execute Transfer
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* Tips */}
         <Card className="glass-card border-amber-500/30">
           <CardHeader className="pb-3">
@@ -578,8 +933,9 @@ export default function AssetsPage() {
           </CardHeader>
           <CardContent>
             <ul className="text-sm text-gray-400 space-y-1">
-              <li>• Click <strong>"Add"</strong> when you receive money (salary, payment, etc.)</li>
-              <li>• Click <strong>"Use"</strong> when you spend from this account</li>
+              <li>• Click <strong>"Add"</strong> / <strong>"Pay"</strong> when you receive money or make a credit card payment</li>
+              <li>• Click <strong>"Use"</strong> / <strong>"Charge"</strong> when you spend or use your credit card</li>
+              <li>• Use <strong>"Transfer"</strong> to move money between accounts (bank ↔ mobile, card payments, etc.)</li>
               <li>• Total shows your combined net worth across all assets</li>
             </ul>
           </CardContent>
