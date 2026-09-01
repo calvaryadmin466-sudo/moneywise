@@ -1,7 +1,8 @@
-import dynamic from "next/dynamic";
 import { Suspense } from "react";
+import SettingsContent from "./settings-content";
 
-const SettingsContent = dynamic(() => import("./settings-content"));
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 export default function SettingsPage() {
   return (

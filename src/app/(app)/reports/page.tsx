@@ -1,7 +1,8 @@
-import dynamic from "next/dynamic";
 import { Suspense } from "react";
+import ReportsContent from "./reports-content";
 
-const ReportsContent = dynamic(() => import("./reports-content"));
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 export default function ReportsPage() {
   return (

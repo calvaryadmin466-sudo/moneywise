@@ -1,7 +1,8 @@
-import dynamic from "next/dynamic";
 import { Suspense } from "react";
+import TransactionsContent from "./transactions-content";
 
-const TransactionsContent = dynamic(() => import("./transactions-content"));
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 export default function TransactionsPage() {
   return (

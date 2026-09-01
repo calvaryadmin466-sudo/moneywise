@@ -1,7 +1,8 @@
-import dynamic from "next/dynamic";
 import { Suspense } from "react";
+import GoalsContent from "./goals-content";
 
-const GoalsContent = dynamic(() => import("./goals-content"));
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 export default function GoalsPage() {
   return (

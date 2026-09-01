@@ -1,7 +1,8 @@
-import dynamic from "next/dynamic";
 import { Suspense } from "react";
+import DashboardContent from "./dashboard-content";
 
-const DashboardContent = dynamic(() => import("./dashboard-content"));
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 export default function DashboardPage() {
   return (

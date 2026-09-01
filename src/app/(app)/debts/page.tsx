@@ -1,7 +1,8 @@
-import dynamic from "next/dynamic";
 import { Suspense } from "react";
+import DebtsContent from "./debts-content";
 
-const DebtsContent = dynamic(() => import("./debts-content"));
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 export default function DebtsPage() {
   return (
