@@ -8,15 +8,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { supabase, getUser } from "@/lib/supabase";
 import { AssetType, AssetTypeConfig } from "@/lib/types";
-import { 
-  Wallet, 
-  Building2, 
-  Smartphone, 
-  TrendingUp, 
-  Banknote, 
-  Plus, 
-  Edit2, 
-  Trash2, 
+import { fetchDseLivePrices, DsePriceEntry } from "@/lib/dse";
+import {
+  Wallet,
+  Building2,
+  Smartphone,
+  TrendingUp,
+  Banknote,
+  Plus,
+  Edit2,
+  Trash2,
   X,
   Save,
   ArrowDownLeft,
@@ -29,7 +30,8 @@ import {
   Briefcase,
   PawPrint,
   Leaf,
-  Box
+  Box,
+  RefreshCw
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
@@ -49,6 +51,8 @@ interface Asset {
   credit_limit?: number | null;
   statement_date?: string | null;
   minimum_payment?: number | null;
+  ticker?: string | null;
+  shares?: number | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -102,7 +106,13 @@ export default function AssetsContent() {
     statement_date: '',
     minimum_payment: '',
     apr: '',
+    ticker: '',
+    shares: '',
   });
+
+  const [dsePrices, setDsePrices] = React.useState<DsePriceEntry[]>([]);
+  const [loadingPrices, setLoadingPrices] = React.useState(false);
+  const [pricesError, setPricesError] = React.useState<string | null>(null);
 
   const [showTransferDialog, setShowTransferDialog] = React.useState(false);
   const [transfer, setTransfer] = React.useState({
@@ -116,7 +126,25 @@ export default function AssetsContent() {
 
   React.useEffect(() => {
     loadAssets();
+    loadDsePrices();
   }, []);
+
+  async function loadDsePrices() {
+    setLoadingPrices(true);
+    try {
+      const prices = await fetchDseLivePrices();
+      setDsePrices(prices);
+      setPricesError(null);
+    } catch (error) {
+      setPricesError(error instanceof Error ? error.message : "Failed to load live prices");
+    } finally {
+      setLoadingPrices(false);
+    }
+  }
+
+  function getDsePrice(ticker?: string | null): DsePriceEntry | undefined {
+    return dsePrices.find((p) => p.company === ticker);
+  }
 
   async function loadAssets() {
     const user = await getUser();
@@ -137,13 +165,29 @@ export default function AssetsContent() {
     const user = await getUser();
     if (!user) return;
 
-    if (!newAsset.name || !newAsset.balance) {
+    const isDseStock = newAsset.type === AssetType.STOCKS && !!newAsset.ticker;
+
+    if (!newAsset.name || (isDseStock ? !newAsset.shares : !newAsset.balance)) {
       toast({
         title: "Error",
-        description: "Please enter a name and balance",
+        description: isDseStock ? "Please enter a name and shares held" : "Please enter a name and balance",
         variant: "destructive",
       });
       return;
+    }
+
+    let balanceValue = parseFloat(newAsset.balance) || 0;
+    if (isDseStock) {
+      const priceEntry = getDsePrice(newAsset.ticker);
+      if (!priceEntry) {
+        toast({
+          title: "Error",
+          description: "Live price unavailable for that ticker, try refreshing prices",
+          variant: "destructive",
+        });
+        return;
+      }
+      balanceValue = (parseFloat(newAsset.shares) || 0) * priceEntry.price;
     }
 
     const { data, error } = await supabase
@@ -152,7 +196,7 @@ export default function AssetsContent() {
         user_id: user.id,
         type: newAsset.type,
         name: newAsset.name,
-        balance: parseFloat(newAsset.balance),
+        balance: balanceValue,
         currency: newAsset.currency,
         account_number: newAsset.account_number || null,
         bank_name: newAsset.bank_name || null,
@@ -161,6 +205,8 @@ export default function AssetsContent() {
         credit_limit: newAsset.credit_limit ? parseFloat(newAsset.credit_limit) : null,
         statement_date: newAsset.statement_date || null,
         minimum_payment: newAsset.minimum_payment ? parseFloat(newAsset.minimum_payment) : null,
+        ticker: isDseStock ? newAsset.ticker : null,
+        shares: isDseStock ? (parseFloat(newAsset.shares) || 0) : null,
       })
       .select()
       .single();
@@ -190,7 +236,25 @@ export default function AssetsContent() {
         statement_date: '',
         minimum_payment: '',
         apr: '',
+        ticker: '',
+        shares: '',
       });
+      loadAssets();
+    }
+  }
+
+  async function handleSyncStockValue(asset: Asset, newBalance: number) {
+    const user = await getUser();
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('user_assets')
+      .update({ balance: newBalance, updated_at: new Date().toISOString() })
+      .eq('id', asset.id)
+      .eq('user_id', user.id);
+
+    if (!error) {
+      toast({ title: "Synced", description: `${asset.name} updated to live market value` });
       loadAssets();
     }
   }
@@ -435,15 +499,73 @@ export default function AssetsContent() {
                 )}
 
                 {newAsset.type === AssetType.STOCKS && (
-                  <div className="space-y-2">
-                    <Label>Broker/Platform</Label>
-                    <Input
-                      value={newAsset.broker_name}
-                      onChange={(e) => setNewAsset({ ...newAsset, broker_name: e.target.value })}
-                      placeholder="e.g., DSE, Hisa, etc."
-                      className="bg-[#0f172a] border-white/20 text-white"
-                    />
-                  </div>
+                  <>
+                    <div className="space-y-2">
+                      <Label>Broker/Platform</Label>
+                      <Input
+                        value={newAsset.broker_name}
+                        onChange={(e) => setNewAsset({ ...newAsset, broker_name: e.target.value })}
+                        placeholder="e.g., DSE, Hisa, etc."
+                        className="bg-[#0f172a] border-white/20 text-white"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>DSE Ticker (optional, for live pricing)</Label>
+                        <button
+                          type="button"
+                          onClick={loadDsePrices}
+                          className="text-cyan-400 hover:text-cyan-300 disabled:opacity-50"
+                          disabled={loadingPrices}
+                          title="Refresh live prices"
+                        >
+                          <RefreshCw className={`h-3.5 w-3.5 ${loadingPrices ? 'animate-spin' : ''}`} />
+                        </button>
+                      </div>
+                      <Select
+                        value={newAsset.ticker}
+                        onValueChange={(v) => setNewAsset({
+                          ...newAsset,
+                          ticker: v === '__none__' ? '' : v,
+                          currency: v === '__none__' ? newAsset.currency : 'TZS',
+                        })}
+                      >
+                        <SelectTrigger className="bg-[#0f172a] border-white/20 text-white">
+                          <SelectValue placeholder="Not listed on DSE" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">Not listed / enter value manually</SelectItem>
+                          {dsePrices.map((p) => (
+                            <SelectItem key={p.company} value={p.company}>
+                              {p.company} — TZS {p.price.toLocaleString()}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {pricesError && (
+                        <p className="text-xs text-amber-400">{pricesError}</p>
+                      )}
+                    </div>
+
+                    {newAsset.ticker && (
+                      <div className="space-y-2">
+                        <Label>Shares Held</Label>
+                        <Input
+                          type="text"
+                          value={newAsset.shares}
+                          onChange={(e) => setNewAsset({ ...newAsset, shares: e.target.value.replace(/[^0-9.]/g, '') })}
+                          placeholder="e.g., 500"
+                          className="bg-[#0f172a] border-white/20 text-white"
+                        />
+                        {newAsset.shares && getDsePrice(newAsset.ticker) && (
+                          <p className="text-xs text-gray-400">
+                            ≈ TZS {((parseFloat(newAsset.shares) || 0) * (getDsePrice(newAsset.ticker)?.price || 0)).toLocaleString()} at current price
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {newAsset.type === AssetType.CREDIT_CARD && (
@@ -519,20 +641,29 @@ export default function AssetsContent() {
                 )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Current Balance</Label>
-                    <Input
-                      type="text"
-                      value={newAsset.balance}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/[^0-9.]/g, '');
-                        setNewAsset({ ...newAsset, balance: value });
-                      }}
-                      placeholder="0.00"
-                      className="bg-[#0f172a] border-white/20 text-white text-lg min-w-[200px]"
-                      style={{ fontSize: '1.125rem', padding: '0.75rem' }}
-                    />
-                  </div>
+                  {newAsset.type === AssetType.STOCKS && newAsset.ticker ? (
+                    <div className="space-y-2">
+                      <Label>Current Balance (auto)</Label>
+                      <div className="bg-[#0f172a] border border-white/20 rounded-md text-lg min-w-[200px] px-3 py-2 text-white">
+                        TZS {((parseFloat(newAsset.shares) || 0) * (getDsePrice(newAsset.ticker)?.price || 0)).toLocaleString()}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label>Current Balance</Label>
+                      <Input
+                        type="text"
+                        value={newAsset.balance}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9.]/g, '');
+                          setNewAsset({ ...newAsset, balance: value });
+                        }}
+                        placeholder="0.00"
+                        className="bg-[#0f172a] border-white/20 text-white text-lg min-w-[200px]"
+                        style={{ fontSize: '1.125rem', padding: '0.75rem' }}
+                      />
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label>Currency</Label>
                     <Select
@@ -580,6 +711,19 @@ export default function AssetsContent() {
             <ArrowUpRight className="h-4 w-4 mr-2 rotate-180" />
             Transfer
           </Button>
+
+          {assets.some(a => a.ticker) && (
+            <Button
+              variant="outline"
+              onClick={loadDsePrices}
+              disabled={loadingPrices}
+              className="border-white/20 text-gray-300 hover:bg-white/5"
+              title="Refresh DSE live prices"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${loadingPrices ? 'animate-spin' : ''}`} />
+              Refresh Prices
+            </Button>
+          )}
         </div>
 
         <Card className="glass-card border-cyan-500/30 bg-gradient-to-r from-cyan-500/10 to-blue-500/10">
@@ -631,7 +775,10 @@ export default function AssetsContent() {
               const availableCredit = Math.max(creditLimit - balance, 0);
               const utilStatus = utilization >= 90 ? 'text-rose-400' : utilization >= 70 ? 'text-amber-400' : 'text-emerald-400';
               const utilBg = utilization >= 90 ? '[&>div]:bg-rose-500' : utilization >= 70 ? '[&>div]:bg-amber-500' : '[&>div]:bg-emerald-500';
-              
+              const dsePrice = asset.type === AssetType.STOCKS && asset.ticker ? getDsePrice(asset.ticker) : undefined;
+              const stockShares = Number(asset.shares) || 0;
+              const stockLiveValue = dsePrice ? stockShares * dsePrice.price : null;
+
               return (
                 <Card key={asset.id} className={`glass-card hover:border-cyan-500/30 transition-colors ${isCreditCard ? 'border-pink-500/20' : ''}`}>
                   <CardContent className="p-4 space-y-3">
@@ -652,6 +799,7 @@ export default function AssetsContent() {
                             {asset.bank_name && <span>• {asset.bank_name}</span>}
                             {asset.account_number && <span>• {asset.account_number}</span>}
                             {asset.broker_name && <span>• {asset.broker_name}</span>}
+                            {asset.ticker && <span>• {asset.ticker}</span>}
                             {isCreditCard && (asset as any).apr && <span>• APR {(asset as any).apr}%</span>}
                             {isCreditCard && asset.statement_date && <span>• stmt {asset.statement_date}</span>}
                           </div>
@@ -718,6 +866,33 @@ export default function AssetsContent() {
                           </span>
                         </div>
                         <Progress value={utilization} className={`h-1.5 ${utilBg}`} />
+                      </div>
+                    )}
+                    {asset.ticker && (
+                      <div className="pt-1 flex items-center justify-between text-[11px]">
+                        <span className="text-gray-400">{stockShares.toLocaleString()} shares</span>
+                        {dsePrice ? (
+                          <div className="flex items-center gap-2">
+                            <span className={dsePrice.change > 0 ? 'text-emerald-400' : dsePrice.change < 0 ? 'text-rose-400' : 'text-gray-400'}>
+                              TZS {dsePrice.price.toLocaleString()}/share
+                              {dsePrice.change !== 0 && ` (${dsePrice.change > 0 ? '+' : ''}${dsePrice.change})`}
+                            </span>
+                            {stockLiveValue !== null && Math.round(stockLiveValue) !== Math.round(Number(asset.balance)) && (
+                              <button
+                                type="button"
+                                onClick={() => handleSyncStockValue(asset, stockLiveValue)}
+                                className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2"
+                                title={`Sync stored balance to live value (TZS ${stockLiveValue.toLocaleString()})`}
+                              >
+                                Sync to TZS {stockLiveValue.toLocaleString()}
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-500">
+                            {pricesError ? 'Live price unavailable' : 'Loading price...'}
+                          </span>
+                        )}
                       </div>
                     )}
                   </CardContent>
